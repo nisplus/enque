@@ -50,10 +50,15 @@ function page_header(string $title, array $options = []): void
     echo '<main class="wrap' . ($wide ? ' wrap-wide' : '') . '">' . "\n";
 }
 
-function page_footer(?string $scriptPath = null): void
+/**
+ * 画面の末尾。読み込むスクリプトは1本でも配列でも渡せる（読み込む順に並べる）。
+ *
+ * @param string|list<string>|null $scripts
+ */
+function page_footer(string|array|null $scripts = null): void
 {
     echo "</main>\n";
-    if ($scriptPath !== null) {
+    foreach (is_array($scripts) ? $scripts : ($scripts === null ? [] : [$scripts]) as $scriptPath) {
         echo '<script src="' . e($scriptPath) . '"></script>' . "\n";
     }
     echo "</body>\n</html>\n";

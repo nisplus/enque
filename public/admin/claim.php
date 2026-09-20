@@ -69,11 +69,24 @@ echo '<h1>景品交換の照会</h1>';
 echo '<p class="muted">来場者の画面に表示されている<strong>QRコードをスマホのカメラで読み取る</strong>と、この画面が開きます。';
 echo '読み取れないときは、下に交換コード（例：ABCD-2345）を入力してください。</p>';
 
+// カメラでの読み取り（使える端末でのみボタンを出す。判定は scan.js が行う）
+echo '<div class="card">';
+echo '<div class="btn-row"><button type="button" class="btn btn-primary btn-block" id="scan-open" hidden>';
+echo 'QRコードを読み取る</button></div>';
+echo '<p class="muted" id="scan-unsupported" hidden></p>';
+echo '<div id="scan-panel" hidden>';
+echo '<div class="scan-view"><video id="scan-video" playsinline muted></video><span class="scan-frame"></span></div>';
+echo '<canvas id="scan-canvas" hidden></canvas>';
+echo '<p class="muted" id="scan-status">カメラを起動しています…</p>';
+echo '<div class="btn-row"><button type="button" class="btn btn-block" id="scan-close">閉じる</button></div>';
+echo '</div>';
+echo '</div>';
+
 echo '<form method="get" class="card">';
-echo '<label class="field" for="code">交換コード</label>';
+echo '<label class="field" for="code">交換コード<span class="hint">読み取れないときはこちらに入力してください。</span></label>';
 echo '<input type="text" id="code" name="code" value="' . e($code) . '" autocomplete="off" '
-    . 'autocapitalize="characters" spellcheck="false" autofocus required>';
-echo '<div class="btn-row"><button type="submit" class="btn btn-primary btn-block">照会する</button></div>';
+    . 'autocapitalize="characters" spellcheck="false" required>';
+echo '<div class="btn-row"><button type="submit" class="btn btn-block">照会する</button></div>';
 echo '</form>';
 
 if ($code !== '' && $claim === null) {
@@ -228,4 +241,5 @@ if ($event !== null) {
     echo '</tbody></table></div></div>';
 }
 
-page_footer();
+// jsQR は Barcode Detection API が無い端末（iOS Safari など）のための読み取り処理
+page_footer(['/assets/vendor/jsqr.min.js', '/assets/scan.js']);

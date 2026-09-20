@@ -503,6 +503,21 @@ $res = request('GET', '/admin/claim.php?code=' . rawurlencode($claimCode), null,
 check('reception can look up a claim code', $res['status'] === 200 && str_contains($res['body'], $claimCode));
 check('unclaimed code is shown as not yet exchanged', str_contains($res['body'], '未交換'));
 check('the lookup page explains the qr scan', str_contains($res['body'], 'カメラで読み取る'));
+check('the lookup page has the scan button and camera panel',
+    str_contains($res['body'], 'id="scan-open"') && str_contains($res['body'], 'id="scan-video"'));
+check('the lookup page loads the scanner scripts',
+    str_contains($res['body'], '/assets/vendor/jsqr.min.js') && str_contains($res['body'], '/assets/scan.js'));
+check('manual code entry is still available', str_contains($res['body'], 'name="code"'));
+
+$res = request('GET', '/assets/vendor/jsqr.min.js', null, 'rcp');
+check('the vendored jsqr is served', $res['status'] === 200 && str_contains($res['body'], 'jsQR'));
+check('the jsqr license header is kept', str_contains($res['body'], 'Apache License 2.0'));
+
+$res = request('GET', '/assets/scan.js', null, 'rcp');
+check('the scanner script is served', $res['status'] === 200 && str_contains($res['body'], 'getUserMedia'));
+
+// 以降の確認のため、照会画面を取り直す（上でアセットを取得して $res を上書きしたため）
+$res = request('GET', '/admin/claim.php?code=' . rawurlencode($claimCode), null, 'rcp');
 check('the claim form lists the registered prizes',
     str_contains($res['body'], 'TEST PRIZE A') && str_contains($res['body'], '残り2個'));
 check('the reception page shows the stock table', str_contains($res['body'], '景品の残数'));
