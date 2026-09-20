@@ -333,6 +333,24 @@ $res = request('GET', '/done.php?e=' . $eventSlug . '&c=ZZZZ-ZZZZ', null, 'nocoo
 check('an unknown code is reported, not silently swapped',
     $res['status'] === 404 && str_contains($res['body'], '交換コードが見つかりません'), 'status=' . $res['status']);
 
+// QRコードには交換コードのURLが入り、読み取った人で行き先が変わる。
+// QRは画像（SVG）なのでURL文字列は本文に出ない。期待するSVGを作って突き合わせる。
+require_once dirname(__DIR__) . '/src/qrcode.php';
+check('the done page embeds the claim url in the qr code',
+    str_contains(done_page()['body'], qr_svg(claim_url($claimCode), 4, 2)));
+check('the claim url points at the scan entry point',
+    str_contains(claim_url($claimCode), '/c/' . $claimCode));
+
+$res = request('GET', '/c/' . rawurlencode($claimCode), null, 'nocookie');
+check('a visitor scanning the qr lands on the done page',
+    $res['status'] === 302 && str_contains((string) $res['location'], '/done.php'), 'location=' . (string) $res['location']);
+
+$res = request('GET', '/c/ZZZZZZZZ', null, 'nocookie');
+check('an unknown code in the qr url returns 404', $res['status'] === 404);
+
+$res = request('GET', '/c.php?code=' . rawurlencode($claimCode), null, 'nocookie');
+check('the query-string form of the qr url also works', $res['status'] === 302);
+
 // 回答フォームにも「同じスマホで」の案内を出す
 $res = request('GET', $surveyPath, null, 'visitor');
 check('survey page tells the visitor to use the same phone', str_contains($res['body'], '同じスマホ'));
@@ -475,9 +493,16 @@ check('reception cannot open company management', $res['status'] === 404);
 $res = request('GET', '/admin/prizes.php', null, 'rcp');
 check('reception cannot register prizes either', $res['status'] === 404, 'status=' . $res['status']);
 
+// 受付がQRを読み取ると、そのまま照会画面へ送られる
+$res = request('GET', '/c/' . rawurlencode($claimCode), null, 'rcp');
+check('reception scanning the qr goes straight to the lookup',
+    $res['status'] === 302 && str_contains((string) $res['location'], '/admin/claim.php?code='),
+    'location=' . (string) $res['location']);
+
 $res = request('GET', '/admin/claim.php?code=' . rawurlencode($claimCode), null, 'rcp');
 check('reception can look up a claim code', $res['status'] === 200 && str_contains($res['body'], $claimCode));
 check('unclaimed code is shown as not yet exchanged', str_contains($res['body'], '未交換'));
+check('the lookup page explains the qr scan', str_contains($res['body'], 'カメラで読み取る'));
 check('the claim form lists the registered prizes',
     str_contains($res['body'], 'TEST PRIZE A') && str_contains($res['body'], '残り2個'));
 check('the reception page shows the stock table', str_contains($res['body'], '景品の残数'));

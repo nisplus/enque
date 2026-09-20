@@ -186,6 +186,21 @@ function overall_url(string $token): string
     return base_url() . '/o.php?t=' . rawurlencode($token);
 }
 
+/**
+ * 交換コードのURL（回答済み画面のQRコードに入れる）。
+ *
+ * 総合受付のスタッフがスマホで読み取ると交換の照会画面が開き、
+ * 来場者自身が読み取ると自分の回答済み画面が開く（c.php で振り分ける）。
+ */
+function claim_url(string $code): string
+{
+    if (config()['pretty_urls']) {
+        return base_url() . '/c/' . rawurlencode($code);
+    }
+
+    return base_url() . '/c.php?code=' . rawurlencode($code);
+}
+
 /** 数値を「12件」のように整形する */
 function count_label(int $n, string $unit = '件'): string
 {

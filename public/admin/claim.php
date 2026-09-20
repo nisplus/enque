@@ -66,7 +66,8 @@ admin_page_header($user, '景品交換の照会', 'claim.php');
 render_alert(flash_take());
 
 echo '<h1>景品交換の照会</h1>';
-echo '<p class="muted">来場者の画面に表示されている交換コード（例：ABCD-2345）を入力してください。</p>';
+echo '<p class="muted">来場者の画面に表示されている<strong>QRコードをスマホのカメラで読み取る</strong>と、この画面が開きます。';
+echo '読み取れないときは、下に交換コード（例：ABCD-2345）を入力してください。</p>';
 
 echo '<form method="get" class="card">';
 echo '<label class="field" for="code">交換コード</label>';
@@ -151,6 +152,8 @@ if ($claim !== null) {
     echo '<div class="btn-row"><button type="submit" class="btn btn-primary"'
         . ($claimed ? ' disabled aria-disabled="true"' : '') . '>交換済みにする</button></div>';
     echo '</form>';
+
+    echo '<div class="btn-row"><a class="btn btn-small" href="claim.php">次の来場者を照会する</a></div>';
     echo '</div>';
 }
 

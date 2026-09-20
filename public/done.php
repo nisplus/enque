@@ -107,8 +107,9 @@ echo '<h1>ご回答ありがとうございました</h1>';
 echo '<div class="card">';
 echo '<p class="center text-secondary">総合受付でこの画面（またはスクリーンショット）をご提示ください。</p>';
 echo '<p class="claim-code">' . e($code) . '</p>';
-echo '<div class="claim-qr">' . qr_svg($code, 5, 2) . '</div>';
-echo '<p class="muted center">交換コード</p>';
+// QRには交換コードのURLを入れる（受付がスマホで読み取ると照会画面が開く）
+echo '<div class="claim-qr">' . qr_svg(claim_url($code), 4, 2) . '</div>';
+echo '<p class="muted center">交換コード（受付でこのQRコードを読み取ります）</p>';
 echo '<p class="muted center">この画面はスクリーンショットの保存、またはブックマークをおすすめします。';
 echo 'このページのURLを開くと、いつでも同じ交換コードを表示できます。</p>';
 echo '</div>';
@@ -147,6 +148,9 @@ if (($visitor['email'] ?? null) === null) {
 } else {
     echo '<div class="alert alert-info">イベント終了後、ご登録のメールアドレス宛に全体アンケートのご案内をお送りします。</div>';
 }
+
+// スタッフがログインしていない状態でQRを読み取った場合の逃げ道
+echo '<p class="muted">スタッフの方はこちら：<a href="/admin/claim.php?code=' . rawurlencode($code) . '">交換の照会画面</a></p>';
 
 echo '<h2>ほかのブースもまわる</h2>';
 echo '<p class="text-secondary">各ブースに掲示されているQRコードを読み取ると、そのブースのアンケートが開きます。';

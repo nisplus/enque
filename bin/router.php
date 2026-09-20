@@ -25,6 +25,12 @@ if (preg_match('#^/o/([A-Za-z0-9]+)/?$#', $path, $m) === 1) {
     return true;
 }
 
+if (preg_match('#^/c/([A-Za-z0-9-]+)/?$#', $path, $m) === 1) {
+    $_GET['code'] = $m[1];
+    require $root . '/c.php';
+    return true;
+}
+
 // 実在するファイルは組み込みサーバーにそのまま処理させる
 if ($path !== '/' && is_file($root . $path)) {
     return false;
