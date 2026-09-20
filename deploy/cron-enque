@@ -1,0 +1,23 @@
+# 全体アンケート案内メールの送信ジョブ（Debian 12 / cron）
+#
+#   sudo cp deploy/cron-enque /etc/cron.d/enque
+#   sudo chown root:root /etc/cron.d/enque && sudo chmod 644 /etc/cron.d/enque
+#
+# 動き方：
+#   イベントの状態を管理画面で「終了（全体アンケート送付）」にすると、このジョブが
+#   メールアドレスを登録した来場者ぶんの案内を作り、5分おきに200件ずつ送る。
+#   送信済みのものは再送されない（overall_invites.status で管理）。
+#   失敗したものは3回まで自動で再試行する。
+#
+# 送信元SMTPのレート制限に合わせて、--limit と実行間隔、.env の SMTP_THROTTLE_MS を調整すること。
+
+SHELL=/bin/sh
+PATH=/usr/local/bin:/usr/bin:/bin
+MAILTO=""
+
+*/5 * * * * www-data cd /var/www/enque && /usr/bin/php bin/send_overall_invites.php --prepare --limit=200 >> logs/invites.log 2>&1
+
+# 個人情報（メールアドレス）の削除：終了から30日過ぎたイベントを毎日 4:10 に処理する。
+# 保持期間は運用ルールに合わせて --older-than の日数を変更すること。
+# 自動削除を使わず、管理画面の「メールアドレスを削除する」で都度実行してもよい。
+10 4 * * * www-data cd /var/www/enque && /usr/bin/php bin/purge_emails.php --older-than=30 --force >> logs/purge.log 2>&1

@@ -1,0 +1,4 @@
+.env
+*.log
+/storage/wallpapers/*
+!/storage/wallpapers/.gitkeep

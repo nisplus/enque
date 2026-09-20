@@ -1,0 +1,264 @@
+# 企業周遊アンケートシステム
+
+複数の企業ブースを周遊するイベントで、来場者がブースのQRコードからその場でアンケートに答え、
+企業担当者・主催者がリアルタイムに集計を見られる、フレームワーク不使用のPHPアプリケーションです。
+
+仕様書：`企業周遊アンケートシステム仕様書.md`（このリポジトリ外で管理）
+
+**来場者は氏名・住所を一切入力しません。** 端末の匿名Cookieだけで回答を束ね、
+メールアドレスのみ任意でお預かりして、イベント終了後の「全体アンケート」案内に使います。
+
+## 動作環境
+
+| 項目 | 想定 |
+|---|---|
+| OS | Debian 12 |
+| Webサーバー | Apache 2.4（php-fpm 推奨、mod_rewrite 有効） |
+| PHP | 8.4（8.1以上で動作。`pdo_mysql` / `mbstring` / `session` / `curl` が必要） |
+| DB | MariaDB 11.8（10.4以上で動作確認済み） |
+
+Composer・Node.js は不要です。QRコード生成・SMTP送信・グラフ描画も外部ライブラリを使わずに実装しています。
+
+## 全体の流れ
+
+```
+来場者  ブースのQR → /s/<イベント>/<企業> で回答 → 回答済み画面（交換コード）
+                                                  ↓ 総合受付で提示
+                                              /admin/claim.php で照会・交換記録
+
+イベント終了（状態を「終了」に）
+  → cron: bin/send_overall_invites.php が案内メールを送信
+  → 来場者: メールの /o/<トークン> で全体アンケートに回答
+  → /wallpaper.php でスマホ壁紙をダウンロード
+```
+
+## ディレクトリ構成
+
+```
+enque/
+├── public/                     ← Apache の DocumentRoot はここを指す
+│   ├── index.php               トップ（QRを読むよう案内するだけ）
+│   ├── s.php                   企業アンケート回答画面（/s/<イベント>/<企業>）
+│   ├── submit.php              POST 回答の受け付け（企業・全体の共通）
+│   ├── done.php                回答済み画面（交換コード・訪問企業一覧）
+│   ├── o.php                   全体アンケート回答画面（/o/<トークン>）
+│   ├── wallpaper.php           壁紙ダウンロード画面
+│   ├── wallpaper_file.php      壁紙の配信（回答済みトークンのみ）
+│   ├── assets/                 style.css / app.js
+│   └── admin/
+│       ├── setup.php           初回の主催者アカウント作成
+│       ├── login.php / logout.php
+│       ├── index.php           ダッシュボード（主催者／企業担当）
+│       ├── companies.php       企業とQRの管理
+│       ├── survey_edit.php     設問の編集（企業・全体・共通テンプレート）
+│       ├── company_stats.php   1社の集計（グラフ）
+│       ├── responses.php       回答一覧
+│       ├── export_csv.php      CSV（1社分／イベント全社分）
+│       ├── qr.php              QR画像（SVG/PNG）
+│       ├── qr_print.php        QR印刷ページ（ブラウザからPDF保存）
+│       ├── claim.php           景品交換の照会・記録
+│       ├── wallpapers.php      壁紙の登録
+│       ├── wallpaper_preview.php
+│       ├── invites.php         全体アンケートと案内メール
+│       └── users.php           管理ユーザー
+├── src/                        ← 非公開。DocumentRoot の外に置く
+│   ├── config.php              設定と環境変数の読み込み
+│   ├── db.php                  PDO接続とトランザクション
+│   ├── helpers.php             エスケープ・URL生成・交換コードなど
+│   ├── survey.php              設問の型と回答値の検証
+│   ├── repository.php          DBアクセス関数群（全てプリペアドステートメント）
+│   ├── visitor.php             来場者の匿名Cookieセッション
+│   ├── auth.php                管理者認証・CSRF・権限・レート制限
+│   ├── view.php                画面の共通部分と設問の描画
+│   ├── render_survey.php       回答フォームの描画（回答画面とエラー再表示で共用）
+│   ├── admin_view.php          管理画面の共通部分と集計の描画
+│   ├── chart.php               インラインSVGのグラフ
+│   ├── csv.php                 CSV出力（UTF-8 BOM・CRLF）
+│   ├── qrcode.php              QRコード生成（自前実装）
+│   ├── mailer.php              SMTPクライアント（自前実装）
+│   └── invites.php             案内メールの本文と送信処理
+├── sql/schema.sql              スキーマ定義
+├── bin/
+│   ├── init_db.php             スキーマ適用（CLI）
+│   ├── seed_demo.php           デモデータ投入（CLI）
+│   ├── send_overall_invites.php 案内メール送信（cron）
+│   ├── purge_emails.php        メールアドレスの削除（CLI/cron）
+│   ├── bench.php               回答送信の負荷試験（CLI）
+│   └── router.php              開発サーバー用ルーター
+├── storage/wallpapers/         壁紙の実体（DocumentRoot外・要書き込み権限）
+├── tests/
+│   ├── unit_test.php           QR・検証・CSVの単体テスト（DB不要）
+│   └── http_test.php           受け入れ条件のE2Eテスト
+├── deploy/apache-enque.conf    Apache設定サンプル
+├── deploy/cron-enque           cron設定サンプル
+├── .env.example                環境変数のテンプレート
+└── serve.cmd                   ローカル開発用サーバー（Windows）
+```
+
+## セットアップ（Debian 12）
+
+```bash
+# 1. 配置
+sudo mkdir -p /var/www/enque
+sudo rsync -a ./ /var/www/enque/
+cd /var/www/enque
+
+# 2. DBユーザーとデータベースを作る
+sudo mariadb <<'SQL'
+CREATE DATABASE IF NOT EXISTS enque
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'enque_app'@'localhost' IDENTIFIED BY '<強いパスワード>';
+GRANT SELECT, INSERT, UPDATE, DELETE ON enque.* TO 'enque_app'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+
+# 3. 接続情報を .env に書く（リポジトリにはコミットしない）
+cp .env.example .env
+sudo -e .env
+sudo chown root:www-data .env && sudo chmod 640 .env
+
+# 4. テーブルを作成する（CREATE権限のあるユーザーで実行）
+sudo mariadb enque < sql/schema.sql
+
+# 5. 書き込み先の権限
+sudo chown -R www-data:www-data logs storage
+
+# 6. Apacheに登録する
+sudo a2enmod rewrite
+sudo cp deploy/apache-enque.conf /etc/apache2/sites-available/enque.conf
+sudo a2ensite enque && sudo systemctl reload apache2
+
+# 7. 案内メールのcronを登録する
+sudo cp deploy/cron-enque /etc/cron.d/enque
+```
+
+`.env` の `DISPLAY_ERRORS` は本番では必ず `0`、HTTPS運用なら `SESSION_SECURE=1` にします。
+**`BASE_URL` はQRコードとメールに埋め込まれるため、QRを印刷する前に必ず本番URLへ設定してください。**
+
+## 初回の操作手順
+
+1. `/admin/setup.php` を開き、主催者アカウントを作成します（この画面は最初の1回だけ使えます）。
+2. ダッシュボードで**イベントを作成**します。状態は「準備中」から始まります。
+3. 「企業・QR」で**出展企業を登録**します。企業ごとに推測困難なURLが自動発行されます。
+4. 必要なら「全体アンケート」ページで**共通設問テンプレート**を作り、各企業の編集画面で取り込みます。
+5. 各企業の「アンケート編集」で設問を登録し、**公開する**にチェックを入れます。
+6. 「QRコードを印刷する（全社）」で印刷し、ブースに掲示します。
+7. 「ユーザー」で企業担当者・総合受付のアカウントを発行します。
+8. イベント当日、イベントの状態を**「開催中」**にすると回答の受け付けが始まります。
+9. イベント終了後、状態を**「終了」**にし、「全体アンケート」ページから案内メールを送ります。
+10. 案内・集計が終わったら、同じページで**メールアドレスを削除**します。
+
+イベントの状態が「開催中」でないと、ブースのアンケートは回答できません（QRを読んでも受付終了と表示されます）。
+
+## ローカル開発（Windows / XAMPP）
+
+```
+copy .env.example .env      REM DB_USER=root、BASE_URL=http://127.0.0.1:8080 などに書き換える
+C:\xampp\php\php.exe bin\init_db.php
+C:\xampp\php\php.exe bin\seed_demo.php --force    REM デモのイベント・企業・設問
+serve.cmd                                          REM http://127.0.0.1:8080/
+```
+
+`serve.cmd` は `bin/router.php` を使い、本番と同じ短いURL（`/s/<イベント>/<企業>`）で動きます。
+
+## テスト
+
+```
+C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（53項目）
+serve.cmd                                                 REM 別ウィンドウで起動しておく
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（91項目）
+```
+
+Debian 側では `php -S 127.0.0.1:8080 -t public bin/router.php` を起動してから
+`php tests/http_test.php --force` を実行します。
+
+E2Eテストは**テスト専用のイベント・企業・管理ユーザーを作成し、終了時に削除**します。
+既存データは触りませんが、念のため開発用DBで実行してください。
+検証内容は、回答の登録・必須チェック・選択肢の改ざん検知・重複フラグ・交換コードの発行と照会・
+権限境界（他社データが見えないこと）・CSV（BOM・メールアドレス非出力）・QR発行・設問編集・
+壁紙のアップロードとダウンロード・全体アンケートのトークン・メールアドレス削除・
+ログインのレート制限・CSRFです。
+
+### 負荷試験
+
+想定規模（各社約400名、全体で延べ約3,000名）に耐えるかは、本番相当の環境で確認します。
+
+```
+php bin/bench.php --url=https://survey.example.jp --survey=<アンケートID> --requests=500 --concurrency=30
+```
+
+PHPの組み込みサーバーは逐次処理のため、**必ず Apache + php-fpm に対して実行**してください。
+テスト回答がDBに入るので、本番データ投入前に行うか、実行後に削除してください。
+
+## 運用上の注意
+
+- **QRコードのURLを再発行すると、印刷済みのQRは使えなくなります。** 企業の編集欄にある
+  「URLを再発行」は、URLが外部に漏れた場合など、貼り替えができるときだけ使ってください。
+- **企業を「停止」しても回答データは消えません。** `companies.is_active` による論理削除で、
+  回答画面が受付停止になり、一覧から外れるだけです。再開すれば元に戻ります。
+- **設問を削除すると、その設問への回答も一緒に消えます**（外部キーの連鎖削除）。
+  回答受付後に設問を削除する場合は、先にCSVを取得してください。
+- **CSVはUTF-8 BOM付き・CRLF改行**です。Excelでそのまま開けます。
+  メールアドレスは出力しません。来場者は匿名ID（`visitor_id`）だけを出力するので、
+  企業をまたいだ同一来場者の突き合わせはこのIDで行えます。
+- ログイン失敗が同一IPから1分間に5回に達すると、そのIPは一時的にロックされます。
+- 案内メールは `overall_invites` で送信済みを管理しており、cronが何度動いても二重送信しません。
+  失敗したものは3回まで自動で再試行します。
+
+## セキュリティ設計
+
+| 対策 | 実装 |
+|---|---|
+| SQLインジェクション | 全クエリをプリペアドステートメント化（`ATTR_EMULATE_PREPARES=false`）。値の文字列連結なし |
+| XSS | 出力は必ず `e()`（`htmlspecialchars`）を通す |
+| CSRF（管理画面） | 全フォームにトークンを発行し `hash_equals` で検証。ログイン成功時に再発行 |
+| CSRF（来場者側） | セッションを作らないため、`Origin` 検証と `SameSite=Lax` のCookieで守る |
+| セッション固定化 | ログイン成功時に `session_regenerate_id(true)` |
+| Cookie | `HttpOnly` / 管理画面は `SameSite=Strict`、来場者は `Lax`／HTTPS時は `Secure` |
+| パスワード | `password_hash(PASSWORD_DEFAULT)` で保存、`password_verify` で照合、必要に応じ再ハッシュ |
+| 総当たり | `admin_login_attempts` による同一IPのレート制限。存在しないユーザーでも応答時間を揃える |
+| 権限境界 | 企業担当者は自社のみ。他社IDを直接開くと **403 ではなく 404** を返す（他社の存在を伏せる）。<br>ロール・所属・有効フラグはセッションに持たず毎リクエストDBから読み直す（無効化が即時反映） |
+| 入力検証 | 選択肢はDBに登録されたものだけを許可、評価は範囲チェック、UTF-8妥当性検査、制御文字の除去 |
+| URLの推測 | イベント・企業のスラグは `random_bytes` 由来。全体アンケートのトークンは20バイト |
+| 壁紙の配布制限 | 画像は DocumentRoot 外に置き、全体アンケート回答済みのトークンがある場合のみ配信 |
+| ファイルアップロード | 拡張子ではなく `getimagesize()` の判定でPNG/JPEGのみ許可。保存名はランダム生成 |
+| CSVインジェクション | `= + - @` で始まるセルの先頭に `'` を付ける |
+| 設定情報 | DB接続情報・SMTP認証情報は `.env`（DocumentRoot外）に置き、リポジトリにコミットしない |
+
+## 仕様に対する補足（判断したこと）
+
+- **QRコード生成は自前実装です。** Composerを使わない構成のため `endroid/qr-code` は入れず、
+  `src/qrcode.php` に8ビットバイトモード・誤り訂正レベルM・型番1〜15のエンコーダを実装しました。
+  JIS X 0510 の既知の値（Reed-Solomon符号・形式情報・型番情報）と突き合わせる単体テストを用意し、
+  生成したQRが実際にデコードできることを外部のQRデコーダで確認済みです（型番1/3/4/5/13）。
+  **印刷前に一度、実機のカメラで読み取り確認**してください。
+- **印刷用PDFはブラウザの「PDFとして保存」を使います。** PDFライブラリを持たない構成のため、
+  `qr_print.php` を印刷用スタイル付きのページとして用意し、変換はブラウザに任せています。
+- **グラフは円グラフではなく横棒グラフです。** 選択肢のラベルが日本語で長くなりやすく、
+  横棒のほうが読み取りやすく比較もしやすいためです。割合（%）は棒の右に併記しています。
+  NPSはスコアと推奨者・中立・批判者の内訳、評価設問は平均値をあわせて表示します。
+- **壁紙はApacheの静的配信ではなくPHP経由で配信します。** 静的配信ではURLを知っていれば
+  誰でも取得できてしまい、「全体アンケートに回答した人への特典」という条件を満たせないためです。
+- **全体アンケートはメールのトークンからのみ回答できます。** 壁紙の配布条件を満たすためで、
+  メールアドレスを登録していない来場者には全体アンケートのURLは発行されません。
+- **企業アンケートの重複送信は拒否しません。** 同じ端末から同じ企業へ再送信された場合も
+  通常どおり受け付け、`responses.is_duplicate` を立てて集計から除きます。
+  画面には「再送信できます」とは表示していません（仕様どおり）。
+- **景品交換は来場者側に拒否を表示しません。** 交換済みかどうかは受付の照会画面にだけ表示し、
+  対応はスタッフの判断に委ねます。交換履歴（日時・対応者・メモ）を残します。
+- **回答期限やブースごとの受付時間は設けていません。** イベントの状態（準備中／開催中／終了）で
+  受付の可否を切り替えます。
+- **SMTPが未設定のときは送信せず `logs/mail-dryrun.log` に書き出します。** 接続情報が届く前でも
+  全体の流れを確認できるようにするためです。本番では必ず `SMTP_HOST` を設定してください。
+- **メールアドレスの削除は手動または日次cronです。** 「案内・集計が完了した」判断は運用側にあるため、
+  管理画面のボタン（即時）と `bin/purge_emails.php --older-than=<日数>`（cron）の両方を用意しました。
+- **PHP 8.4 を前提にしつつ、8.1以上で動作する構文にとどめています**（`enum`・`never`・`match` は使用）。
+  ローカル検証は XAMPP の PHP 8.2.12 / MariaDB 10.4.32 で行いました。
+
+## 仕様書の未確定事項について
+
+| 項目 | 現状の実装 |
+|---|---|
+| 景品の総数・在庫上限 | 上限の設定機能は未実装。照会画面に発行数・交換済み数を表示し、在庫はスタッフが確認する運用。上限を設けるなら `prize_claims` の交換済み件数に対する閾値チェックを追加する |
+| 外部SMTPの接続情報 | `.env` の `SMTP_*` に設定するだけで有効になる。未設定のうちはドライラン（ログ出力）で動作確認できる |
+| 回答データ本体の保持期間 | 自動削除は実装していない（メールアドレスのみ削除対象）。保持期間が決まり次第、`bin/purge_emails.php` と同じ形で削除スクリプトを追加する |

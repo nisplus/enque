@@ -1,0 +1,9 @@
+# DocumentRoot は public/ を指す前提だが、万一この階層が公開領域に入っても
+# 直接アクセスできないようにする（多層防御）。
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
