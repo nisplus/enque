@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/src/bootstrap.php';
 require_once dirname(__DIR__, 2) . '/src/admin_view.php';
+require_once dirname(__DIR__, 2) . '/src/insights.php';
 
 $user = require_admin();
 $role = (string) $user['role'];
@@ -178,6 +179,21 @@ echo '</div>';
 
 echo '<h2>時間帯別の回答数（全社）</h2>';
 echo '<div class="card">' . svg_line_chart(event_responses_by_hour($eventId)) . '</div>';
+
+// 周回の傾向はさわりだけ出し、詳しくは専用ページへ誘導する
+$laps    = visitor_laps($eventId);
+$lapTime = lap_time_stats($laps);
+echo '<h2>回答者の傾向</h2>';
+echo '<div class="card">';
+echo '<div class="stat-grid">';
+render_stat('平均 周回時間', format_duration($lapTime['summary']['avg']),
+    $lapTime['summary']['count'] . '人（2社以上回った方）');
+render_stat('周回時間の中央値', format_duration($lapTime['summary']['median']));
+render_stat('最長 周回時間', format_duration($lapTime['summary']['max']));
+echo '</div>';
+echo '<p class="muted">周回企業数の分布、まわる順番、よくある動線、回答率などは「回答者傾向」で見られます。</p>';
+echo '<div class="btn-row"><a class="btn" href="insights.php?event=' . $eventId . '">回答者傾向を見る</a></div>';
+echo '</div>';
 
 echo '<h2>企業別の回答数</h2>';
 echo '<div class="card"><div class="table-scroll"><table>';

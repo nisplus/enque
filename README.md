@@ -61,6 +61,7 @@ enque/
 │       ├── companies.php       企業とQRの管理
 │       ├── survey_edit.php     設問の編集（企業・全体・共通テンプレート）
 │       ├── company_stats.php   1社の集計（グラフ）
+│       ├── insights.php        回答者傾向（周回時間・周回企業数・動線）
 │       ├── responses.php       回答一覧
 │       ├── export_csv.php      CSV（1社分／イベント全社分）
 │       ├── qr.php              QR画像（SVG/PNG）
@@ -83,6 +84,7 @@ enque/
 │   ├── render_survey.php       回答フォームの描画（回答画面とエラー再表示で共用）
 │   ├── admin_view.php          管理画面の共通部分と集計の描画
 │   ├── chart.php               インラインSVGのグラフ
+│   ├── insights.php            回答者傾向の集計（周回時間・順番・動線など）
 │   ├── csv.php                 CSV出力（UTF-8 BOM・CRLF）
 │   ├── qrcode.php              QRコード生成（自前実装）
 │   ├── mailer.php              メール送信（postfix中継／外部SMTP／ログ の切替）
@@ -95,6 +97,7 @@ enque/
 │   ├── send_overall_invites.php 案内メール送信（cron）
 │   ├── purge_emails.php        メールアドレスの削除（CLI/cron）
 │   ├── bench.php               回答送信の負荷試験（CLI）
+│   ├── seed_traffic.php        画面確認用のダミー周遊データ（CLI・開発用）
 │   └── router.php              開発サーバー用ルーター
 ├── storage/wallpapers/         壁紙の実体（DocumentRoot外・要書き込み権限）
 ├── tests/
@@ -270,12 +273,43 @@ serve.cmd                                          REM http://127.0.0.1:8080/
 
 `serve.cmd` は `bin/router.php` を使い、本番と同じ短いURL（`/s/<イベント>/<企業>`）で動きます。
 
+## 回答者の傾向（主催者向け）
+
+管理画面の「回答者傾向」（`/admin/insights.php`）で、1人あたりの動きを集計して見られます。
+企業をまたいだ動きが見えるため、**主催者のみ**が開けます。
+
+| 表示 | 内容 |
+|---|---|
+| 周回時間 | 最初の回答から最後の回答までの平均・中央値・最長・最短と、その分布 |
+| 周回企業数 | 平均・中央値・最大・最小と、「何社回った人が何人いたか」の分布 |
+| 企業をまわる順番 | 企業ごとの「平均何番目に回られたか」と、そこから周遊を始めた人数 |
+| よくある動線 | 「A社の次にB社」の多い組み合わせ 上位20 |
+| 時間帯別のユニーク来場者数 | 回答数ではなく人数の推移 |
+| 周回企業数と評価の関係 | 1社 / 2〜3社 / 4社以上ごとの平均評価とNPS |
+| 回答・登録の割合 | 回答率・重複送信率・メール登録率・全体アンケート回答率・景品交換率 |
+
+数え方の前提（画面にも注記しています）:
+
+- **「周回時間」は滞在時間ではありません。** 最初の回答から最後の回答までの間隔なので、
+  入場から1社目まで、最後のブースから退場までは含みません。
+- **1社だけ回った方は周回時間が0**になるため、時間の集計からは除き、人数だけ別に表示します。
+- 来場者は端末の匿名Cookie単位です。端末を変えた方は別の方として数えられます。
+- 重複送信（同じ企業への2回目以降）は数えません。
+- 「周回企業数と評価の関係」は**相関であって因果ではありません**（もともと関心の高い方が
+  たくさん回っている、とも読めます）。
+
+画面の見え方を確認したいときは、ダミーの周遊データを作れます（**開発用DBのみ**）。
+
+```
+C:\xampp\php\php.exe bin\seed_traffic.php --force --visitors=200
+```
+
 ## テスト
 
 ```
 C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（53項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（166項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（197項目）
 node tests\scan_test.js                                   REM QR読み取り判定（17項目・Nodeがある場合のみ）
 ```
 

@@ -20,6 +20,7 @@ if (PHP_SAPI !== 'cli') {
 
 require_once dirname(__DIR__) . '/src/bootstrap.php';
 require_once dirname(__DIR__) . '/src/invites.php';
+require_once dirname(__DIR__) . '/src/insights.php';
 
 $argvValues = array_slice($argv, 1);
 $force      = in_array('--force', $argvValues, true);
@@ -567,9 +568,17 @@ check('the other prize is untouched', $stock[1]['claimed'] === 0);
 check('a prize without a quantity has no remaining count', $stock[1]['remaining'] === null);
 
 // 2人目に渡すと在庫が尽き、それ以上は超過として記録される
-$claim2Row = find_claim_by_code((string) db()->query(
-    'SELECT claim_code FROM prize_claims WHERE id <> ' . (int) $claim['id'] . ' ORDER BY id LIMIT 1'
-)->fetchColumn());
+// このテストのイベント内で、まだ交換していないコードを1つ選ぶ
+// （他のイベントのデータに手を出すと、開発DBの状態しだいで結果が変わってしまう）
+$otherClaim = db()->prepare(
+    'SELECT pc.claim_code FROM prize_claims pc
+     JOIN visitors v ON v.id = pc.visitor_id
+     WHERE v.event_id = ? AND pc.id <> ? AND pc.claimed_at IS NULL
+     ORDER BY pc.id LIMIT 1'
+);
+$otherClaim->execute([$eventId, (int) $claim['id']]);
+$otherCode = $otherClaim->fetchColumn();
+$claim2Row = $otherCode === false ? null : find_claim_by_code((string) $otherCode);
 if ($claim2Row !== null) {
     mark_claimed((int) $claim2Row['id'], 'TEST 受付', null, $prizeAId);
     $stock = prize_stock($eventId);
@@ -823,6 +832,130 @@ check('answered link goes straight to the wallpaper page',
 
 $stats = invite_stats($eventId);
 check('invite is marked as responded', $stats['responded'] === 1);
+
+echo "=== visitor insights ===\n";
+
+// 集計の正しさを確かめるため、時刻まで決め打ちした回答を別イベントに作る
+$insightEventId = create_event('TEST INSIGHT ' . $stamp, date('Y-m-d'), date('Y-m-d'), 'open');
+$insightCompanies = [];
+foreach (['I-A', 'I-B', 'I-C'] as $name) {
+    $companyId = create_company($insightEventId, $name . ' ' . $stamp, null, null, null);
+    $company   = find_company($companyId);
+    $survey    = ensure_company_survey($company);
+    replace_questions((int) $survey['id'], [
+        ['id' => null, 'type' => 'rating', 'label' => '満足度', 'options' => [], 'required' => false],
+    ]);
+    update_survey((int) $survey['id'], $name, null, true);
+    $insightCompanies[$name] = [
+        'company_id' => $companyId,
+        'survey_id'  => (int) $survey['id'],
+        'question'   => (int) questions_for_survey((int) $survey['id'])[0]['id'],
+    ];
+}
+
+/** 指定した時刻・評価で回答を1件作る */
+$addResponse = static function (int $visitorId, string $company, string $at, ?string $rating) use ($insightCompanies): void {
+    $surveyId = $insightCompanies[$company]['survey_id'];
+    $answers  = $rating === null ? [] : [$insightCompanies[$company]['question'] => $rating];
+    $result   = insert_response($surveyId, $visitorId, $answers);
+
+    $stmt = db()->prepare('UPDATE responses SET submitted_at = ? WHERE id = ?');
+    $stmt->execute([$at, $result['response_id']]);
+};
+
+$today = date('Y-m-d');
+$v1 = (int) find_or_create_visitor($insightEventId, str_repeat('1', 64))['id'];
+$v2 = (int) find_or_create_visitor($insightEventId, str_repeat('2', 64))['id'];
+$v3 = (int) find_or_create_visitor($insightEventId, str_repeat('3', 64))['id'];
+
+// v1: A(10:00) → B(10:30)    周回30分・2社
+$addResponse($v1, 'I-A', $today . ' 10:00:00', '5');
+$addResponse($v1, 'I-B', $today . ' 10:30:00', '5');
+// v2: A(11:00) のみ          1社（時間の集計からは除外）
+$addResponse($v2, 'I-A', $today . ' 11:00:00', '3');
+// v3: B(12:00) → A(12:10) → C(12:40)   周回40分・3社
+$addResponse($v3, 'I-B', $today . ' 12:00:00', '4');
+$addResponse($v3, 'I-A', $today . ' 12:10:00', '4');
+$addResponse($v3, 'I-C', $today . ' 12:40:00', '4');
+
+$laps    = visitor_laps($insightEventId);
+$lapTime = lap_time_stats($laps);
+$lapCos  = lap_company_stats($laps);
+
+check('every visitor appears once in the lap data', count($laps) === 3);
+check('the single-company visitor is counted separately', $lapTime['single_company_visitors'] === 1);
+check('lap time uses only visitors with two or more booths', $lapTime['summary']['count'] === 2);
+check('the average lap time is correct', (int) $lapTime['summary']['avg'] === 2100, // (1800+2400)/2
+    'avg=' . $lapTime['summary']['avg']);
+check('the shortest lap time is correct', (int) $lapTime['summary']['min'] === 1800);
+check('the longest lap time is correct', (int) $lapTime['summary']['max'] === 2400);
+check('the median lap time is correct', (int) $lapTime['summary']['median'] === 2100);
+
+check('the average booth count is correct', $lapCos['summary']['avg'] === 2.0, 'avg=' . $lapCos['summary']['avg']);
+check('the largest booth count is correct', (int) $lapCos['summary']['max'] === 3);
+check('the booth count distribution is correct',
+    ($lapCos['distribution']['1社'] ?? -1) === 1
+    && ($lapCos['distribution']['2社'] ?? -1) === 1
+    && ($lapCos['distribution']['3社'] ?? -1) === 1);
+
+$order = [];
+foreach (company_visit_order($insightEventId) as $row) {
+    $order[substr($row['name'], 0, 3)] = $row;
+}
+check('the first-visit count is correct', $order['I-A']['first_visits'] === 2 && $order['I-B']['first_visits'] === 1);
+check('the average position is correct',
+    $order['I-A']['avg_position'] === 1.33 && $order['I-C']['avg_position'] === 3.0,
+    'A=' . $order['I-A']['avg_position'] . ' C=' . $order['I-C']['avg_position']);
+
+$transitions = [];
+foreach (company_transitions($insightEventId, 20) as $row) {
+    $transitions[substr($row['from'], 0, 3) . '>' . substr($row['to'], 0, 3)] = $row['count'];
+}
+check('the a-to-b transition is counted', ($transitions['I-A>I-B'] ?? 0) === 1);
+check('the reverse transition is counted separately', ($transitions['I-B>I-A'] ?? 0) === 1);
+check('the later transition is counted', ($transitions['I-A>I-C'] ?? 0) === 1);
+check('no transition is invented for the single-booth visitor', array_sum($transitions) === 3);
+
+$moves = move_interval_stats($insightEventId);
+check('move intervals are measured between consecutive answers', $moves['count'] === 3);
+check('the median move interval is correct', (int) $moves['median'] === 1800, 'median=' . $moves['median']);
+
+// 回答は6件あるが、時間帯ごとの「人数」は 10時=1人・11時=1人・12時=1人 の計3
+$hourly = hourly_unique_visitors($insightEventId);
+check('hourly unique visitors are counted per person, not per answer',
+    array_sum($hourly) === 3 && max($hourly) === 1,
+    'sum=' . array_sum($hourly) . ' max=' . max($hourly));
+
+$satisfaction = satisfaction_by_lap_count($insightEventId, $laps);
+check('satisfaction is grouped by booth count',
+    $satisfaction[0]['visitors'] === 1 && $satisfaction[1]['visitors'] === 2);
+check('the rating average is computed per group',
+    $satisfaction[0]['rating_avg'] === 3.0, 'one-booth avg=' . var_export($satisfaction[0]['rating_avg'], true));
+
+echo "=== insights page ===\n";
+
+$res = request('GET', '/admin/insights.php?event=' . $insightEventId, null, 'org');
+check('the insights page opens for the organizer', $res['status'] === 200, 'status=' . $res['status']);
+check('the insights page shows the booth-count section', str_contains($res['body'], '1人あたりの周回企業数'));
+check('the insights page shows the lap-time section', str_contains($res['body'], '1人あたりの周回時間'));
+check('the insights page shows the visit order', str_contains($res['body'], '企業をまわる順番'));
+check('the insights page shows the transitions', str_contains($res['body'], 'よくある動線'));
+check('the insights page explains what lap time means', str_contains($res['body'], '滞在時間ではありません')
+    || str_contains($res['body'], '含みません'));
+
+$res = request('GET', '/admin/insights.php?event=' . $insightEventId, null, 'co');
+check('a company user cannot open the insights page', $res['status'] === 404, 'status=' . $res['status']);
+
+$res = request('GET', '/admin/insights.php?event=' . $insightEventId, null, 'rcp');
+check('reception cannot open the insights page', $res['status'] === 404);
+
+$res = request('GET', '/admin/index.php?event=' . $insightEventId, null, 'org');
+check('the dashboard links to the insights page', str_contains($res['body'], 'insights.php'));
+check('the dashboard shows the average lap time', str_contains($res['body'], '平均 周回時間'));
+
+// 後片付け（このイベントぶんだけ消す）
+$cleanup = db()->prepare('DELETE FROM events WHERE id = ?');
+$cleanup->execute([$insightEventId]);
 
 echo "=== closed event ===\n";
 

@@ -42,6 +42,7 @@ function admin_page_header(array $user, string $title, string $current = ''): vo
         $nav = [
             ['href' => 'index.php',      'label' => 'ダッシュボード'],
             ['href' => 'companies.php',  'label' => '企業・QR'],
+            ['href' => 'insights.php',   'label' => '回答者傾向'],
             ['href' => 'wallpapers.php', 'label' => '壁紙'],
             ['href' => 'invites.php',    'label' => '全体アンケート'],
             ['href' => 'prizes.php',     'label' => '景品'],
