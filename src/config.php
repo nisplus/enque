@@ -93,7 +93,8 @@ function env_bool(string $key, bool $default = false): bool
  *   login_max_attempts: int,
  *   login_window_seconds: int,
  *   min_password_length: int,
- *   mail: array{from: string, from_name: string, host: string, port: int, secure: string, user: string, pass: string, throttle_ms: int}
+ *   mail: array{transport: string, sendmail_path: string, from: string, from_name: string, host: string,
+ *               port: int, secure: string, user: string, pass: string, throttle_ms: int}
  * }
  */
 function config(): array
@@ -128,14 +129,17 @@ function config(): array
         'login_window_seconds' => 60,
         'min_password_length'  => 8,
         'mail' => [
-            'from'        => (string) env('MAIL_FROM', 'no-reply@example.jp'),
-            'from_name'   => (string) env('MAIL_FROM_NAME', 'イベント事務局'),
-            'host'        => (string) env('SMTP_HOST', ''),
-            'port'        => (int) env('SMTP_PORT', '587'),
-            'secure'      => strtolower((string) env('SMTP_SECURE', 'tls')),
-            'user'        => (string) env('SMTP_USER', ''),
-            'pass'        => (string) env('SMTP_PASS', ''),
-            'throttle_ms' => (int) env('SMTP_THROTTLE_MS', '200'),
+            // 送信方式：postfix（ローカルのsendmail経由で中継）／ smtp（外部SMTPに直接接続）／ log（送信せずログ）
+            'transport'     => strtolower((string) env('MAIL_TRANSPORT', 'postfix')),
+            'sendmail_path' => (string) env('SENDMAIL_PATH', '/usr/sbin/sendmail'),
+            'from'          => (string) env('MAIL_FROM', 'no-reply@example.jp'),
+            'from_name'     => (string) env('MAIL_FROM_NAME', 'イベント事務局'),
+            'host'          => (string) env('SMTP_HOST', ''),
+            'port'          => (int) env('SMTP_PORT', '587'),
+            'secure'        => strtolower((string) env('SMTP_SECURE', 'tls')),
+            'user'          => (string) env('SMTP_USER', ''),
+            'pass'          => (string) env('SMTP_PASS', ''),
+            'throttle_ms'   => (int) env('SMTP_THROTTLE_MS', '200'),
         ],
     ];
 

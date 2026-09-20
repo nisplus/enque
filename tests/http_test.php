@@ -247,6 +247,7 @@ $res = request('POST', '/submit.php', [
 $json = json_decode($res['body'], true);
 check('valid submission succeeds', $res['status'] === 200 && ($json['ok'] ?? false) === true, 'status=' . $res['status']);
 check('submission redirects to the done page', str_contains((string) ($json['redirect'] ?? ''), '/done.php'));
+check('the redirect already carries the claim code', str_contains((string) ($json['redirect'] ?? ''), '&c='));
 check('first submission is not marked as duplicate', ($json['duplicate'] ?? true) === false);
 
 check('response is stored', count_responses($surveyAId) === 1);
@@ -285,17 +286,79 @@ check('another device counts as a separate response', count_responses($surveyAId
 
 echo "=== done page and claim code ===\n";
 
+/**
+ * 回答済み画面を開く。
+ *
+ * コード無しのURLは、交換コード付きのURL（ブックマーク用）へ1回転送されるので追いかける。
+ *
+ * @return array{status: int, body: string, location: ?string, headers: string}
+ */
+function done_page(string $jar = 'visitor'): array
+{
+    global $eventSlug;
+
+    $res = request('GET', '/done.php?e=' . $eventSlug, null, $jar);
+    if ($res['status'] === 302 && $res['location'] !== null) {
+        $res = request('GET', (string) $res['location'], null, $jar);
+    }
+
+    return $res;
+}
+
 $res = request('GET', '/done.php?e=' . $eventSlug);
+check('done page redirects to a bookmarkable url with the claim code',
+    $res['status'] === 302 && str_contains((string) $res['location'], 'c='),
+    'location=' . (string) $res['location']);
+
+$res = done_page();
 check('done page returns 200', $res['status'] === 200);
 check('done page shows the visited booth', str_contains($res['body'], 'TEST CO A'));
 check('done page shows a claim code',
     preg_match('/[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}/', strip_tags($res['body'])) === 1);
 preg_match('/([2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4})/', strip_tags($res['body']), $codeMatch);
 $claimCode = $codeMatch[1] ?? '';
-check('claim code is not re-issued on reload', (function () use ($eventSlug, $claimCode): bool {
-    $again = request('GET', '/done.php?e=' . $eventSlug);
-    return str_contains($again['body'], $claimCode);
-})());
+check('done page tells the visitor to use the same phone', str_contains($res['body'], '同じスマホ'));
+check('done page suggests a screenshot or bookmark',
+    str_contains($res['body'], 'スクリーンショット') && str_contains($res['body'], 'ブックマーク'));
+check('claim code is not re-issued on reload', str_contains(done_page()['body'], $claimCode));
+
+// Cookie が無い端末でも、コード付きURLなら同じ画面に戻れる
+$codeUrl = '/done.php?e=' . $eventSlug . '&c=' . rawurlencode($claimCode);
+$res = request('GET', $codeUrl, null, 'nocookie');
+check('the code url opens without the visitor cookie', $res['status'] === 200, 'status=' . $res['status']);
+check('the code url shows the same claim code', str_contains($res['body'], $claimCode));
+check('the code url lists the same booths', str_contains($res['body'], 'TEST CO A'));
+
+$res = request('GET', '/done.php?e=' . $eventSlug . '&c=ZZZZ-ZZZZ', null, 'nocookie');
+check('an unknown code is reported, not silently swapped',
+    $res['status'] === 404 && str_contains($res['body'], '交換コードが見つかりません'), 'status=' . $res['status']);
+
+// 回答フォームにも「同じスマホで」の案内を出す
+$res = request('GET', $surveyPath, null, 'visitor');
+check('survey page tells the visitor to use the same phone', str_contains($res['body'], '同じスマホ'));
+
+// 2社目のブースを回っても、交換コードは来場者ごとに1つのまま（ブースごとには発行しない）
+$qB  = (int) questions_for_survey($surveyBId)[0]['id'];
+$res = request('POST', '/submit.php', [
+    'survey_id'      => (string) $surveyBId,
+    'q[' . $qB . ']' => 'はい',
+], 'visitor', ['Accept: application/json']);
+check('answering a second booth succeeds', $res['status'] === 200);
+
+$res = done_page();
+check('the claim code stays the same after a second booth', str_contains($res['body'], $claimCode));
+check('the done page now lists both booths',
+    str_contains($res['body'], 'TEST CO A') && str_contains($res['body'], 'TEST CO B'));
+$claimRow  = find_claim_by_code($claimCode);
+$claimStmt = db()->prepare('SELECT COUNT(*) FROM prize_claims WHERE visitor_id = ?');
+$claimStmt->execute([(int) $claimRow['visitor_id']]);
+check('one claim code per visitor, not per booth', (int) $claimStmt->fetchColumn() === 1);
+check('the visitor is counted as having visited two booths',
+    visited_company_count((int) $claimRow['visitor_id']) === 2);
+
+// ブースのQRスラグは企業ごとに固定で、回答しても変わらない
+check('the booth url does not change after answering',
+    (string) (find_company($companyAId)['qr_slug'] ?? '') === (string) $companyA['qr_slug']);
 
 echo "=== admin access control ===\n";
 
@@ -360,6 +423,46 @@ $res = request('GET', '/admin/export_csv.php?event=' . $eventId, null, 'org');
 check('organizer csv covers every company',
     str_contains($res['body'], 'TEST CO A') && str_contains($res['body'], '企業名'));
 
+echo "=== prizes ===\n";
+
+$res = request('GET', '/admin/prizes.php?event=' . $eventId, null, 'org');
+check('prize page opens for the organizer', $res['status'] === 200);
+$token = csrf_from($res['body']);
+
+$res = request('POST', '/admin/prizes.php', [
+    'csrf_token' => $token,
+    'action'     => 'create',
+    'event_id'   => (string) $eventId,
+    'name'       => 'TEST PRIZE A',
+    'total_qty'  => '2',
+    'note'       => '先着2名',
+], 'org');
+check('a prize can be registered', $res['status'] === 302);
+
+$res = request('POST', '/admin/prizes.php', [
+    'csrf_token' => $token,
+    'action'     => 'create',
+    'event_id'   => (string) $eventId,
+    'name'       => 'TEST PRIZE B',
+    'total_qty'  => '',
+], 'org');
+check('a prize without a quantity is allowed', $res['status'] === 302);
+
+$stock = prize_stock($eventId);
+check('both prizes are stored', count($stock) === 2);
+check('the quantity is kept', $stock[0]['total_qty'] === 2);
+check('an unmanaged quantity stays null', $stock[1]['total_qty'] === null);
+check('nothing is claimed yet', $stock[0]['claimed'] === 0 && $stock[0]['remaining'] === 2);
+
+$prizeAId = (int) $stock[0]['id'];
+$prizeBId = (int) $stock[1]['id'];
+
+$res = request('GET', '/admin/prizes.php?event=' . $eventId, null, 'org');
+check('the prize page shows the remaining count', str_contains($res['body'], 'TEST PRIZE A') && str_contains($res['body'], '残数'));
+
+$res = request('GET', '/admin/prizes.php?event=' . $eventId, null, 'co');
+check('a company user cannot register prizes', $res['status'] === 404, 'status=' . $res['status']);
+
 echo "=== prize claim ===\n";
 
 $res = request('GET', '/admin/login.php', null, 'rcp');
@@ -369,17 +472,40 @@ request('POST', '/admin/login.php', ['csrf_token' => $token, 'username' => $rece
 $res = request('GET', '/admin/companies.php', null, 'rcp');
 check('reception cannot open company management', $res['status'] === 404);
 
+$res = request('GET', '/admin/prizes.php', null, 'rcp');
+check('reception cannot register prizes either', $res['status'] === 404, 'status=' . $res['status']);
+
 $res = request('GET', '/admin/claim.php?code=' . rawurlencode($claimCode), null, 'rcp');
 check('reception can look up a claim code', $res['status'] === 200 && str_contains($res['body'], $claimCode));
 check('unclaimed code is shown as not yet exchanged', str_contains($res['body'], '未交換'));
+check('the claim form lists the registered prizes',
+    str_contains($res['body'], 'TEST PRIZE A') && str_contains($res['body'], '残り2個'));
+check('the reception page shows the stock table', str_contains($res['body'], '景品の残数'));
 
 $token = csrf_from($res['body']);
 $claim = find_claim_by_code($claimCode);
+
+// 景品を選ばずに記録しようとすると差し戻される
 $res = request('POST', '/admin/claim.php', [
     'csrf_token' => $token,
     'action'     => 'mark',
     'code'       => $claimCode,
     'claim_id'   => (string) $claim['id'],
+    'note'       => '景品未選択',
+], 'rcp');
+check('marking without choosing a prize is refused', $res['status'] === 302);
+check('the claim is still open', (find_claim_by_code($claimCode)['claimed_at'] ?? null) === null);
+
+$res = request('GET', '/admin/claim.php?code=' . rawurlencode($claimCode), null, 'rcp');
+check('the reason is shown to the staff', str_contains($res['body'], '渡した景品を選んでください'));
+$token = csrf_from($res['body']);
+
+$res = request('POST', '/admin/claim.php', [
+    'csrf_token' => $token,
+    'action'     => 'mark',
+    'code'       => $claimCode,
+    'claim_id'   => (string) $claim['id'],
+    'prize_id'   => (string) $prizeAId,
     'note'       => 'テスト景品',
 ], 'rcp');
 check('marking as claimed redirects back', $res['status'] === 302);
@@ -387,14 +513,43 @@ check('marking as claimed redirects back', $res['status'] === 302);
 $res = request('GET', '/admin/claim.php?code=' . rawurlencode($claimCode), null, 'rcp');
 check('claimed code shows the exchange time', str_contains($res['body'], '交換済み'));
 check('claim history records the staff name', str_contains($res['body'], 'TEST 受付'));
+check('claim history records the prize', str_contains($res['body'], 'TEST PRIZE A'));
+check('the claim page shows which prize was handed over', str_contains($res['body'], '渡した景品'));
 
 $claim = find_claim_by_code($claimCode);
 check('claimed_at is stored once', ($claim['claimed_at'] ?? null) !== null);
+check('the prize is stored on the claim', (int) $claim['prize_id'] === $prizeAId);
 check('second claim attempt does not overwrite the record', !mark_claimed((int) $claim['id'], 'x', null));
 
-// 来場者側には「交換済み」と表示しない
-$res = request('GET', '/done.php?e=' . $eventSlug);
+$stock = prize_stock($eventId);
+check('the stock goes down by one', $stock[0]['claimed'] === 1 && $stock[0]['remaining'] === 1);
+check('the other prize is untouched', $stock[1]['claimed'] === 0);
+check('a prize without a quantity has no remaining count', $stock[1]['remaining'] === null);
+
+// 2人目に渡すと在庫が尽き、それ以上は超過として記録される
+$claim2Row = find_claim_by_code((string) db()->query(
+    'SELECT claim_code FROM prize_claims WHERE id <> ' . (int) $claim['id'] . ' ORDER BY id LIMIT 1'
+)->fetchColumn());
+if ($claim2Row !== null) {
+    mark_claimed((int) $claim2Row['id'], 'TEST 受付', null, $prizeAId);
+    $stock = prize_stock($eventId);
+    check('the prize runs out at the registered quantity', $stock[0]['remaining'] === 0);
+
+    // 在庫が無くても記録はできる（実際に渡したものを残せるようにするため）
+    $extra = find_or_create_claim((int) find_or_create_visitor($eventId, str_repeat('f', 64))['id']);
+    mark_claimed((int) $extra['id'], 'TEST 受付', null, $prizeAId);
+    $stock = prize_stock($eventId);
+    check('handing out past the quantity is recorded as an overage',
+        $stock[0]['remaining'] === 0 && $stock[0]['over'] === 1 && $stock[0]['claimed'] === 3);
+}
+
+// 来場者側には「交換済み」と表示しない（コード付きURLで開いた場合も同じ）
+$res = done_page();
 check('visitor page does not reveal the claimed state',
+    !str_contains($res['body'], '交換済み') && str_contains($res['body'], $claimCode));
+
+$res = request('GET', '/done.php?e=' . $eventSlug . '&c=' . rawurlencode($claimCode), null, 'nocookie');
+check('the code url does not reveal the claimed state either',
     !str_contains($res['body'], '交換済み') && str_contains($res['body'], $claimCode));
 
 echo "=== qr code ===\n";
@@ -456,6 +611,51 @@ check('rejected save does not change the question type',
 
 $res = request('POST', '/admin/survey_edit.php', array_merge($editPost, ['csrf_token' => 'bogus']), 'org');
 check('editor rejects a missing CSRF token', $res['status'] === 400);
+
+// 「保存して設問を追加」は、画面の先頭ではなく追加された設問へ戻す
+$res = request('POST', '/admin/survey_edit.php', array_merge($editPost, ['action' => 'save_add']), 'org');
+check('save-and-add jumps to the new question', str_ends_with((string) $res['location'], '#q-new'),
+    'location=' . (string) $res['location']);
+
+$res = request('GET', '/admin/survey_edit.php?survey=' . $surveyAId . '&add=1', null, 'org');
+check('the new question block carries the anchor id', str_contains($res['body'], 'id="q-new"'));
+check('the new question input takes focus', str_contains($res['body'], 'autofocus'));
+check('existing questions are anchored too', str_contains($res['body'], 'id="q-1"'));
+
+echo "=== mail transport ===\n";
+
+check('transport falls back to log when nothing is configured', mail_transport() === 'log');
+check('the label explains the current transport', str_contains(mail_transport_label(), 'mail-dryrun.log'));
+
+$res = request('GET', '/admin/invites.php?event=' . $eventId, null, 'org');
+check('the admin page warns that no transport is set', str_contains($res['body'], 'MAIL_TRANSPORT'));
+$token = csrf_from($res['body']);
+
+$logFile  = project_root() . '/logs/mail-dryrun.log';
+$testMail = 'mailtest+' . $stamp . '@example.jp';
+$res = request('POST', '/admin/invites.php', [
+    'csrf_token' => $token,
+    'action'     => 'test_mail',
+    'event_id'   => (string) $eventId,
+    'test_email' => $testMail,
+], 'org');
+check('test mail is accepted', $res['status'] === 302);
+
+// filesize() は stat キャッシュに載るため、内容で確かめる
+clearstatcache(true, $logFile);
+$logBody = is_file($logFile) ? (string) file_get_contents($logFile) : '';
+check('test mail is written to the dry-run log', str_contains($logBody, $testMail));
+check('the dry-run log holds the survey link', str_contains($logBody, '/o/TESTTOKEN'));
+
+// メッセージの組み立て（postfix に渡す内容とSMTPで送る内容は同じ）
+$message = build_mail_message('no-reply@example.jp', 'イベント事務局', 'to@example.jp', '件名テスト', "本文\n2行目");
+check('message headers are MIME encoded',
+    str_contains($message, 'Content-Type: text/plain; charset=UTF-8')
+    && str_contains($message, 'Subject: =?UTF-8?B?'));
+check('message body is base64 encoded',
+    str_contains($message, base64_encode("本文\n2行目")));
+check('message declares the envelope recipient in the To header',
+    str_contains($message, 'To: <to@example.jp>'));
 
 echo "=== wallpaper upload ===\n";
 
@@ -579,6 +779,26 @@ check('emails are deleted after the campaign', $result['visitors'] === 1);
 $emailStmt->execute([$eventId]);
 check('no email remains for the event', (int) $emailStmt->fetchColumn() === 0);
 check('responses survive the purge', count_responses($surveyAId) === 2);
+
+echo "=== email registration from the code url ===\n";
+
+// 別端末（Cookieなし）でコード付きURLを開いた人も、あとからメールを登録できる
+$res = done_page('visitor2');
+preg_match('/([2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4})/', strip_tags($res['body']), $codeMatch2);
+$claimCode2 = $codeMatch2[1] ?? '';
+check('the second visitor has its own claim code', $claimCode2 !== '' && $claimCode2 !== $claimCode);
+
+$lateEmail = 'late+' . $stamp . '@example.jp';
+$res = request('POST', '/done.php?e=' . $eventSlug . '&c=' . rawurlencode($claimCode2), [
+    'c'     => $claimCode2,
+    'email' => $lateEmail,
+], 'nocookie');
+check('email registered from the code url is accepted',
+    $res['status'] === 200 && str_contains($res['body'], 'メールアドレスを登録しました'), 'status=' . $res['status']);
+
+$claim2 = find_claim_by_code($claimCode2);
+$visitor2Row = find_visitor((int) $claim2['visitor_id']);
+check('the email lands on the right visitor', (string) ($visitor2Row['email'] ?? '') === $lateEmail);
 
 echo "=== login rate limit ===\n";
 

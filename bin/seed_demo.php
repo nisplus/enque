@@ -75,6 +75,12 @@ replace_questions($overallId, [
 ]);
 echo "全体アンケートを作成しました。\n";
 
+// 景品（総合受付が交換時に選ぶ）
+create_prize($eventId, 'オリジナルトートバッグ', 100, '先着100名');
+create_prize($eventId, 'ボールペン', 300, null);
+create_prize($eventId, 'パンフレット', null, '数量は管理しない');
+echo "景品を3件登録しました。\n";
+
 if (admin_user_count() === 0) {
     echo "\n管理ユーザーがまだありません。/admin/setup.php で主催者アカウントを作成してください。\n";
 }

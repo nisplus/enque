@@ -122,9 +122,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             ],
             $questions
         ));
-        flash_set('success', $action === 'save_add' ? '保存しました。設問を追加してください。' : 'アンケートを保存しました。');
+        flash_set('success', $action === 'save_add' ? '保存しました。続けて設問を入力してください。' : 'アンケートを保存しました。');
 
-        redirect('survey_edit.php?survey=' . $surveyId . ($action === 'save_add' ? '&add=1' : ''));
+        // 「保存して設問を追加」では、画面の先頭ではなく追加された設問の位置に戻す
+        redirect('survey_edit.php?survey=' . $surveyId . ($action === 'save_add' ? '&add=1#q-new' : ''));
     }
     // エラー時はこのまま再表示する（入力値はDBから読み直す）
 }
@@ -169,15 +170,24 @@ echo '</div>';
 echo '<h2>設問（' . count($questions) . '問）</h2>';
 
 $index = 0;
-$render = static function (?array $question, int $index): void {
+
+/**
+ * 設問1問ぶんの編集欄。
+ *
+ * 各ブロックに id を振り、「保存して設問を追加」の直後は #q-new へ飛ばして
+ * 画面の先頭ではなく追加された設問が見えるようにする（$isNew のときは入力欄に
+ * カーソルも当てる）。
+ */
+$render = static function (?array $question, int $index, bool $isNew = false): void {
     $id       = $question === null ? 0 : (int) $question['id'];
     $type     = $question === null ? 'single' : (string) $question['type'];
     $label    = $question === null ? '' : (string) $question['label'];
     $required = $question !== null && (int) $question['required'] === 1;
     $options  = $question === null ? [] : question_options($question);
+    $anchor   = $isNew ? 'q-new' : 'q-' . ($index + 1);
 
-    echo '<div class="q-editor">';
-    echo '<div class="q-head"><strong>設問 ' . ($index + 1) . '</strong>';
+    echo '<div class="q-editor" id="' . $anchor . '">';
+    echo '<div class="q-head"><strong>設問 ' . ($index + 1) . ($isNew ? '（新規）' : '') . '</strong>';
     if ($id > 0) {
         echo '<label class="muted"><input type="checkbox" name="q[' . $index . '][delete]" value="1"> 削除する</label>';
     }
@@ -185,7 +195,8 @@ $render = static function (?array $question, int $index): void {
     echo '<input type="hidden" name="q[' . $index . '][id]" value="' . $id . '">';
 
     echo '<div class="q-grid">';
-    echo '<label class="field">設問文<input type="text" name="q[' . $index . '][label]" value="' . e($label) . '"></label>';
+    echo '<label class="field">設問文<input type="text" name="q[' . $index . '][label]" value="' . e($label) . '"'
+        . ($isNew ? ' autofocus' : '') . '></label>';
     echo '<label class="field">種類<select name="q[' . $index . '][type]">';
     foreach (QuestionType::cases() as $case) {
         $selected = $case->value === $type ? ' selected' : '';
@@ -212,7 +223,7 @@ foreach ($questions as $question) {
 
 // 「保存して設問を追加」で空欄を1つ出す。初回（設問ゼロ）も空欄を出す
 if ($addBlank || $questions === []) {
-    $render(null, $index);
+    $render(null, $index, true);
 }
 
 echo '<div class="btn-row">';

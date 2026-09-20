@@ -4,13 +4,18 @@ declare(strict_types=1);
 require_once __DIR__ . '/config.php';
 
 /**
- * 外部SMTPサーバー経由のメール送信（最小限のSMTPクライアント）。
+ * メール送信。送信方式は .env の MAIL_TRANSPORT で選ぶ。
+ *
+ *   postfix … ローカルの sendmail コマンド（postfix）に渡し、中継はサーバー側に任せる（既定）
+ *   smtp    … 外部SMTPサーバーに直接接続する（最小限のSMTPクライアントを内蔵）
+ *   log     … 送信せず logs/mail-dryrun.log に書き出す（開発・受け入れテスト用）
  *
  * Composer を使わない構成のため PHPMailer は入れず、必要な手順
- * （EHLO / STARTTLS / AUTH / MAIL FROM / RCPT TO / DATA）だけを実装する。
+ * （EHLO / STARTTLS / AUTH / MAIL FROM / RCPT TO / DATA）だけを実装している。
  *
- * SMTP_HOST が未設定のときは送信せず、logs/mail-dryrun.log に内容を書き出す
- * （開発・受け入れテスト用。接続情報が届く前でも全体の流れを確認できる）。
+ * postfix が動いているサーバーでは、ローカルの 127.0.0.1:25 に smtp で繋ぐ方式でも中継できる
+ * （MAIL_TRANSPORT=smtp / SMTP_HOST=127.0.0.1 / SMTP_PORT=25 / SMTP_SECURE=none）。
+ * sendmail コマンドが使えない環境ではこちらを選ぶ。
  */
 
 class SmtpException extends RuntimeException
@@ -22,15 +27,99 @@ class SmtpException extends RuntimeException
  */
 function send_mail(string $toEmail, string $subject, string $body): void
 {
-    $mail = config()['mail'];
-
-    if ($mail['host'] === '') {
-        mail_dry_run($toEmail, $subject, $body);
-        return;
-    }
-
+    $mail    = config()['mail'];
     $message = build_mail_message($mail['from'], $mail['from_name'], $toEmail, $subject, $body);
 
+    switch (mail_transport()) {
+        case 'log':
+            mail_dry_run($toEmail, $subject, $body);
+            return;
+
+        case 'postfix':
+            send_via_sendmail($mail['sendmail_path'], $mail['from'], $message);
+            return;
+
+        default:
+            send_via_smtp($mail, $toEmail, $message);
+    }
+}
+
+/**
+ * 実際に使う送信方式を返す。
+ *
+ * 設定が足りない場合（postfix なのに sendmail が無い、smtp なのにホスト未設定）は
+ * log にフォールバックし、なぜ送信しなかったかをエラーログに残す。
+ * 黙って失敗させないための保険で、本番では設定を直すこと。
+ */
+function mail_transport(): string
+{
+    $mail      = config()['mail'];
+    $transport = $mail['transport'];
+
+    if ($transport === 'log') {
+        return 'log';
+    }
+
+    if ($transport === 'smtp') {
+        if ($mail['host'] === '') {
+            error_log('MAIL_TRANSPORT=smtp ですが SMTP_HOST が未設定です。送信せずログに書き出します。');
+            return 'log';
+        }
+        return 'smtp';
+    }
+
+    // 既定は postfix（ローカル中継）
+    if (!is_executable($mail['sendmail_path'])) {
+        error_log('sendmail コマンドが見つかりません（' . $mail['sendmail_path'] . '）。送信せずログに書き出します。');
+        return 'log';
+    }
+
+    return 'postfix';
+}
+
+/**
+ * ローカルの sendmail（postfix）にメッセージを渡す。
+ *
+ * -t  宛先をヘッダの To: から読む
+ * -i  行頭のドットを終端として扱わない
+ * -f  エンベロープの送信者（バウンス先）を指定する
+ */
+function send_via_sendmail(string $sendmailPath, string $from, string $message): void
+{
+    // パスに空白が含まれても壊れないよう、コマンド名も引数として引用する
+    $command = escapeshellarg($sendmailPath) . ' -t -i -f ' . escapeshellarg($from);
+
+    $descriptors = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $process = @proc_open($command, $descriptors, $pipes);
+    if (!is_resource($process)) {
+        throw new SmtpException('sendmail を起動できません：' . $sendmailPath);
+    }
+
+    fwrite($pipes[0], $message . "\r\n");
+    fclose($pipes[0]);
+
+    $stdout = stream_get_contents($pipes[1]) ?: '';
+    $stderr = stream_get_contents($pipes[2]) ?: '';
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    $exitCode = proc_close($process);
+    if ($exitCode !== 0) {
+        throw new SmtpException('sendmail が異常終了しました（終了コード ' . $exitCode . '）：' . trim($stderr . ' ' . $stdout));
+    }
+}
+
+/**
+ * 外部SMTPサーバーへ直接送る。
+ *
+ * @param array<string,mixed> $mail config()['mail']
+ */
+function send_via_smtp(array $mail, string $toEmail, string $message): void
+{
     $secure  = $mail['secure'];
     $host    = ($secure === 'ssl' ? 'ssl://' : '') . $mail['host'];
     $errno   = 0;
@@ -146,8 +235,20 @@ function mail_dry_run(string $to, string $subject, string $body): void
     @file_put_contents($logDir . '/mail-dryrun.log', $entry, FILE_APPEND | LOCK_EX);
 }
 
-/** SMTPが設定されているか（管理画面での注意表示に使う） */
+/** 実際に送信できる設定になっているか（管理画面での注意表示に使う） */
 function mail_is_configured(): bool
 {
-    return config()['mail']['host'] !== '';
+    return mail_transport() !== 'log';
+}
+
+/** 管理画面に出す、現在の送信方式の説明 */
+function mail_transport_label(): string
+{
+    $mail = config()['mail'];
+
+    return match (mail_transport()) {
+        'postfix' => 'ローカルのpostfix経由（' . $mail['sendmail_path'] . '）',
+        'smtp'    => '外部SMTP直結（' . $mail['host'] . ':' . $mail['port'] . '）',
+        default   => '送信しない（logs/mail-dryrun.log に書き出し）',
+    };
 }

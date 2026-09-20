@@ -735,17 +735,17 @@ function find_claim_by_code(string $code): ?array
 }
 
 /**
- * 交換済みとして記録する。
+ * 交換済みとして記録する（渡した景品も残す）。
  *
  * 既に交換済みの場合も記録は上書きせず false を返す（判断はスタッフに委ねる）。
  */
-function mark_claimed(int $claimId, string $staff, ?string $note): bool
+function mark_claimed(int $claimId, string $staff, ?string $note, ?int $prizeId = null): bool
 {
     $stmt = db()->prepare(
-        'UPDATE prize_claims SET claimed_at = NOW(), claimed_by = ?, note = ?
+        'UPDATE prize_claims SET claimed_at = NOW(), claimed_by = ?, note = ?, prize_id = ?
          WHERE id = ? AND claimed_at IS NULL'
     );
-    $stmt->execute([$staff, $note, $claimId]);
+    $stmt->execute([$staff, $note, $prizeId, $claimId]);
 
     return $stmt->rowCount() === 1;
 }
@@ -754,14 +754,136 @@ function mark_claimed(int $claimId, string $staff, ?string $note): bool
 function claim_history(int $eventId, int $limit = 100): array
 {
     $stmt = db()->prepare(
-        'SELECT pc.claim_code, pc.claimed_at, pc.claimed_by, pc.note
-         FROM prize_claims pc JOIN visitors v ON v.id = pc.visitor_id
+        'SELECT pc.claim_code, pc.claimed_at, pc.claimed_by, pc.note, p.name AS prize_name
+         FROM prize_claims pc
+         JOIN visitors v ON v.id = pc.visitor_id
+         LEFT JOIN prizes p ON p.id = pc.prize_id
          WHERE v.event_id = ? AND pc.claimed_at IS NOT NULL
          ORDER BY pc.claimed_at DESC LIMIT ' . max(1, $limit)
     );
     $stmt->execute([$eventId]);
 
     return $stmt->fetchAll();
+}
+
+// ================================================================ 景品
+
+/** @return list<array<string,mixed>> */
+function prizes_for_event(int $eventId, bool $includeInactive = false): array
+{
+    $sql = 'SELECT * FROM prizes WHERE event_id = ?';
+    if (!$includeInactive) {
+        $sql .= ' AND is_active = 1';
+    }
+    $sql .= ' ORDER BY sort_order, id';
+
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$eventId]);
+
+    return $stmt->fetchAll();
+}
+
+function find_prize(int $id): ?array
+{
+    $stmt = db()->prepare('SELECT * FROM prizes WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+
+    return $row === false ? null : $row;
+}
+
+function create_prize(int $eventId, string $name, ?int $totalQty, ?string $note): int
+{
+    $order = db()->prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM prizes WHERE event_id = ?');
+    $order->execute([$eventId]);
+
+    $stmt = db()->prepare(
+        'INSERT INTO prizes (event_id, name, total_qty, note, sort_order) VALUES (?, ?, ?, ?, ?)'
+    );
+    $stmt->execute([$eventId, $name, $totalQty, $note, (int) $order->fetchColumn()]);
+
+    return (int) db()->lastInsertId();
+}
+
+function update_prize(int $id, string $name, ?int $totalQty, ?string $note, int $sortOrder): void
+{
+    $stmt = db()->prepare(
+        'UPDATE prizes SET name = ?, total_qty = ?, note = ?, sort_order = ? WHERE id = ?'
+    );
+    $stmt->execute([$name, $totalQty, $note, $sortOrder, $id]);
+}
+
+/** 景品の取り扱いを止める・再開する（交換記録は残す） */
+function set_prize_active(int $id, bool $active): void
+{
+    $stmt = db()->prepare('UPDATE prizes SET is_active = ? WHERE id = ?');
+    $stmt->execute([$active ? 1 : 0, $id]);
+}
+
+/** その景品で交換済みの件数 */
+function prize_claimed_count(int $prizeId): int
+{
+    $stmt = db()->prepare('SELECT COUNT(*) FROM prize_claims WHERE prize_id = ? AND claimed_at IS NOT NULL');
+    $stmt->execute([$prizeId]);
+
+    return (int) $stmt->fetchColumn();
+}
+
+/**
+ * 景品ごとの在庫状況。
+ *
+ * remaining は残数（数量を管理しない景品は null）。
+ * 在庫を超えて渡した場合はマイナスにせず、over に超過数を入れる
+ * （品切れでも記録できるようにしているため。記録の正しさを優先する）。
+ *
+ * @return list<array{id: int, name: string, total_qty: ?int, note: ?string, is_active: int,
+ *                    sort_order: int, claimed: int, remaining: ?int, over: int}>
+ */
+function prize_stock(int $eventId, bool $includeInactive = true): array
+{
+    $sql = 'SELECT p.*, COUNT(pc.id) AS claimed
+            FROM prizes p
+            LEFT JOIN prize_claims pc ON pc.prize_id = p.id AND pc.claimed_at IS NOT NULL
+            WHERE p.event_id = ?';
+    if (!$includeInactive) {
+        $sql .= ' AND p.is_active = 1';
+    }
+    $sql .= ' GROUP BY p.id ORDER BY p.sort_order, p.id';
+
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$eventId]);
+
+    $rows = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $total   = $row['total_qty'] === null ? null : (int) $row['total_qty'];
+        $claimed = (int) $row['claimed'];
+
+        $rows[] = [
+            'id'        => (int) $row['id'],
+            'name'      => (string) $row['name'],
+            'total_qty' => $total,
+            'note'       => $row['note'] === null ? null : (string) $row['note'],
+            'is_active'  => (int) $row['is_active'],
+            'sort_order' => (int) $row['sort_order'],
+            'claimed'   => $claimed,
+            'remaining' => $total === null ? null : max(0, $total - $claimed),
+            'over'      => $total === null ? 0 : max(0, $claimed - $total),
+        ];
+    }
+
+    return $rows;
+}
+
+/** 景品を指定していない交換の件数（景品登録前に記録したぶん） */
+function claims_without_prize(int $eventId): int
+{
+    $stmt = db()->prepare(
+        'SELECT COUNT(*) FROM prize_claims pc JOIN visitors v ON v.id = pc.visitor_id
+         WHERE v.event_id = ? AND pc.claimed_at IS NOT NULL AND pc.prize_id IS NULL'
+    );
+    $stmt->execute([$eventId]);
+
+    return (int) $stmt->fetchColumn();
 }
 
 // ================================================================ 全体アンケート案内

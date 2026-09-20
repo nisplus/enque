@@ -50,7 +50,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             flash_set(
                 $result['failed'] > 0 ? 'warn' : 'success',
                 '送信しました：成功' . $result['sent'] . '件／失敗' . $result['failed'] . '件'
-                . (mail_is_configured() ? '' : '（SMTP未設定のため logs/mail-dryrun.log に書き出しました）')
+                . (mail_is_configured() ? '' : '（送信方式が未設定のため logs/mail-dryrun.log に書き出しました）')
             );
         } catch (Throwable $e) {
             flash_set('error', $e->getMessage());
@@ -64,8 +64,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             try {
                 send_mail($to, '[テスト] ' . $mail['subject'], $mail['body']);
                 flash_set('success', mail_is_configured()
-                    ? 'テストメールを送信しました。'
-                    : 'SMTP未設定のため、logs/mail-dryrun.log に書き出しました。');
+                    ? 'テストメールを送信しました（' . mail_transport_label() . '）。'
+                    : '送信方式が未設定のため、logs/mail-dryrun.log に書き出しました。');
             } catch (Throwable $e) {
                 flash_set('error', '送信に失敗しました：' . $e->getMessage());
             }
@@ -89,9 +89,13 @@ render_alert(flash_take());
 echo '<h1>全体アンケートと案内メール</h1>';
 echo '<p class="muted">' . e((string) $event['name']) . '（' . e(event_status_label((string) $event['status'])) . '）</p>';
 
-if (!mail_is_configured()) {
-    echo '<div class="alert alert-warn">SMTPサーバーが未設定です（.env の SMTP_HOST）。';
-    echo 'この状態では実際には送信せず、メール内容を logs/mail-dryrun.log に書き出します。</div>';
+if (mail_is_configured()) {
+    echo '<p class="muted">送信方式：' . e(mail_transport_label()) . '</p>';
+} else {
+    echo '<div class="alert alert-warn">メールの送信方式が設定されていません（.env の MAIL_TRANSPORT）。';
+    echo 'この状態では実際には送信せず、メール内容を logs/mail-dryrun.log に書き出します。<br>';
+    echo 'サーバーのpostfixで中継する場合は <code class="mono">MAIL_TRANSPORT=postfix</code>、';
+    echo '外部SMTPに直接接続する場合は <code class="mono">MAIL_TRANSPORT=smtp</code> と接続情報を設定してください。</div>';
 }
 
 // ---- 1. 全体アンケート

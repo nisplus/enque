@@ -131,7 +131,7 @@ $view = [
     'invalid'     => [],
     'error'       => null,
     'email_value' => $emailInput,
-    'footer_note' => $type === 'company' ? '送信後、総合受付で提示できる交換コードが表示されます。' : null,
+    'footer_note' => $type === 'company' ? '送信後、総合受付で提示できる交換コードが表示されます。ほかのブースも同じスマホ・同じブラウザで読み取ると、1つの交換コードにまとまります。' : null,
 ];
 
 if (!is_valid_utf8($_POST)) {
@@ -171,9 +171,12 @@ try {
     $result = insert_response($surveyId, (int) $visitor['id'], $answers);
 
     if ($type === 'company') {
-        // いずれか1社に回答した時点で交換コードを発行する
-        find_or_create_claim((int) $visitor['id']);
-        $redirect = '/done.php?e=' . rawurlencode((string) $event['slug']);
+        // いずれか1社に回答した時点で交換コードを発行する。
+        // 交換コードをURLに含めておくと、Cookieが消えても
+        // ブックマーク・スクリーンショットのURLから同じ画面に戻れる。
+        $claim    = find_or_create_claim((int) $visitor['id']);
+        $redirect = '/done.php?e=' . rawurlencode((string) $event['slug'])
+            . '&c=' . rawurlencode((string) $claim['claim_code']);
     } else {
         mark_invite_responded((int) $invite['id']);
         $redirect = '/wallpaper.php?t=' . rawurlencode((string) $invite['token']);

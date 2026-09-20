@@ -266,7 +266,12 @@ tr.is-duplicate td { color: var(--text-muted); }
 details.answers-detail summary { cursor: pointer; color: var(--accent); }
 
 /* 管理画面の設問エディタ ---------------------------------------------------- */
-.q-editor { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: var(--surface-2); }
+/* scroll-margin-top は #q-new へ飛んだときに固定ヘッダーで隠れないようにするため */
+.q-editor {
+  border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px;
+  background: var(--surface-2); scroll-margin-top: 76px;
+}
+.q-editor:target { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .q-editor .q-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .q-editor .q-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
 @media (min-width: 720px) {

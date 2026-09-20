@@ -128,17 +128,36 @@ CREATE TABLE IF NOT EXISTS wallpapers (
   CONSTRAINT fk_wallpaper_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 景品 ---------------------------------------------------------------------
+-- total_qty が NULL のものは数量を管理しない（ノベルティなど数えないもの）。
+CREATE TABLE IF NOT EXISTS prizes (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  event_id   INT UNSIGNED NOT NULL,
+  name       VARCHAR(255) NOT NULL,
+  total_qty  INT UNSIGNED NULL,
+  note       VARCHAR(255) NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active  TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_prize_event (event_id, is_active, sort_order),
+  CONSTRAINT fk_prize_event FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 景品交換 -----------------------------------------------------------------
 -- 回答済み画面に表示する交換コード。来場者1人につき1件。
+-- prize_id は渡した景品（受付が交換時に選ぶ）。景品を登録する前の記録は NULL。
 CREATE TABLE IF NOT EXISTS prize_claims (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   visitor_id INT UNSIGNED NOT NULL UNIQUE,
   claim_code VARCHAR(16) NOT NULL UNIQUE,
+  prize_id   INT UNSIGNED NULL,
   claimed_at DATETIME NULL,
   claimed_by VARCHAR(100) NULL,
   note       VARCHAR(255) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_claim_visitor FOREIGN KEY (visitor_id) REFERENCES visitors(id) ON DELETE CASCADE
+  INDEX idx_claim_prize (prize_id),
+  CONSTRAINT fk_claim_visitor FOREIGN KEY (visitor_id) REFERENCES visitors(id) ON DELETE CASCADE,
+  CONSTRAINT fk_claim_prize   FOREIGN KEY (prize_id)   REFERENCES prizes(id)   ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 全体アンケートの案内メール ------------------------------------------------

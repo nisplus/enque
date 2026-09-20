@@ -44,6 +44,7 @@ function admin_page_header(array $user, string $title, string $current = ''): vo
             ['href' => 'companies.php',  'label' => '企業・QR'],
             ['href' => 'wallpapers.php', 'label' => '壁紙'],
             ['href' => 'invites.php',    'label' => '全体アンケート'],
+            ['href' => 'prizes.php',     'label' => '景品'],
             ['href' => 'claim.php',      'label' => '景品照会'],
             ['href' => 'users.php',      'label' => 'ユーザー'],
         ];
