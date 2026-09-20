@@ -148,6 +148,41 @@ sudo cp deploy/cron-enque /etc/cron.d/enque
 `.env` の `DISPLAY_ERRORS` は本番では必ず `0`、HTTPS運用なら `SESSION_SECURE=1` にします。
 **`BASE_URL` はQRコードとメールに埋め込まれるため、QRを印刷する前に必ず本番URLへ設定してください。**
 
+## 更新（デプロイ）とデータベースのマイグレーション
+
+稼働中のサーバーを新しい版に更新する手順です。**回答や企業・設問などの既存データは消えません。**
+
+```bash
+cd /var/www/enque
+
+# 1. 念のためデータベースをバックアップする（数秒で終わります）
+mysqldump -u root -p enque > ~/enque_$(date +%Y%m%d_%H%M).sql
+
+# 2. 新しいコードを取り込む
+sudo -u www-data git pull --rebase origin main
+
+# 3. DBの変更を適用する（下の一覧の、まだ流していないものを順に実行）
+#    アプリ用ユーザー（enque_app）には CREATE / ALTER 権限が無いため、管理者ユーザーで実行する
+mysql -u root -p enque < sql/migrate_prizes.sql
+
+# 4. 反映確認
+mysql -u root -p enque -e "SHOW TABLES; SHOW COLUMNS FROM prize_claims;"
+```
+
+### マイグレーション一覧
+
+| ファイル | 内容 | いつ必要か |
+|---|---|---|
+| `sql/migrate_prizes.sql` | `prizes` テーブルの追加と、`prize_claims.prize_id`（渡した景品）の追加 | 景品機能より前に `sql/schema.sql` でDBを作った場合 |
+
+- **新規に構築する場合は `sql/schema.sql` だけで足ります**（マイグレーションは不要です）。
+- マイグレーションは `IF NOT EXISTS` で書いてあるので、**二度流しても壊れません**。
+  適用済みかどうか分からないときは、そのまま実行して構いません。
+- 既存の交換記録は `prize_id` が空（景品なし）になります。残数の計算からは除かれ、
+  受付画面に「景品を選ばずに記録された交換が n 件あります」と表示されます。
+- 今後スキーマを変更するときは `sql/schema.sql`（新規構築用）と `sql/migrate_*.sql`（既存DB用）の
+  両方を更新し、この表に1行足します。
+
 ## メール送信の設定
 
 案内メールの送信方式は `.env` の `MAIL_TRANSPORT` で選びます。
