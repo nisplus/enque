@@ -96,6 +96,7 @@ enque/
 ├── deploy/apache-enque.conf    Apache設定サンプル
 ├── deploy/cron-enque           cron設定サンプル
 ├── .env.example                環境変数のテンプレート
+├── .gitattributes              改行コードの固定（Linux配置ぶんは必ずLF）
 └── serve.cmd                   ローカル開発用サーバー（Windows）
 ```
 
@@ -259,6 +260,10 @@ PHPの組み込みサーバーは逐次処理のため、**必ず Apache + php-f
   受付の選択肢から外れるだけです。残数の表には「停止中」として残ります。
 - 既にテーブルを作成済みのデータベースに景品機能を足す場合は `sql/migrate_prizes.sql` を流します
   （新規構築なら `sql/schema.sql` だけで足ります）。
+- **改行コードは `.gitattributes` で LF に固定しています。** 本番は Linux（Debian）配置のため、
+  Windows で編集してもリポジトリと配置先は必ず LF になります。これが無いと環境によっては CRLF が
+  混入し、`deploy/cron-enque`（CRLF だと cron がジョブを読めない）やシェルから実行するファイルが
+  壊れます。Windows専用の `serve.cmd` だけは CRLF で取り出す設定です。
 - **CSVはUTF-8 BOM付き・CRLF改行**です。Excelでそのまま開けます。
   メールアドレスは出力しません。来場者は匿名ID（`visitor_id`）だけを出力するので、
   企業をまたいだ同一来場者の突き合わせはこのIDで行えます。

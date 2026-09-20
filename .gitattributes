@@ -1,0 +1,24 @@
+# 改行コードの扱いを固定する。
+#
+# 本番は Debian（Linux）に配置するため、リポジトリに入る内容も、そこから
+# 取り出したファイルも必ず LF にする。Windows で編集してもCRLFが混ざらない。
+#
+# これが無いと、クローンした環境の core.autocrlf の設定しだいで CRLF が
+# 混入することがあり、特に次のファイルが壊れる：
+#   - deploy/cron-enque … cron はCRLFの行を解釈できずジョブが動かない
+#   - シェルから実行するスクリプト … 行末の ^M でコマンドが見つからなくなる
+* text=auto eol=lf
+
+# Windows 専用のバッチファイルだけは CRLF で取り出す（cmd.exe 向け）
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# 改行変換をしてはいけないファイル（壁紙・QR画像など）
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
