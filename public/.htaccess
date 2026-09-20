@@ -21,6 +21,6 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule ^s/([A-Za-z0-9_-]+)/([A-Za-z0-9_-]+)/?$ s.php?e=$1&c=$2 [L,QSA]
-    RewriteRule ^o/([A-Za-z0-9]+)/?$ o.php?t=$1 [L,QSA]
+    RewriteRule ^o/([A-Za-z0-9-]+)/?$ o.php?t=$1 [L,QSA]
     RewriteRule ^c/([A-Za-z0-9-]+)/?$ c.php?code=$1 [L,QSA]
 </IfModule>

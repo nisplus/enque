@@ -19,7 +19,7 @@ if (preg_match('#^/s/([A-Za-z0-9_-]+)/([A-Za-z0-9_-]+)/?$#', $path, $m) === 1) {
     return true;
 }
 
-if (preg_match('#^/o/([A-Za-z0-9]+)/?$#', $path, $m) === 1) {
+if (preg_match('#^/o/([A-Za-z0-9-]+)/?$#', $path, $m) === 1) {
     $_GET['t'] = $m[1];
     require $root . '/o.php';
     return true;

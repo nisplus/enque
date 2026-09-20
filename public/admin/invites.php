@@ -60,9 +60,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         if (!is_valid_email($to)) {
             flash_set('error', 'テスト送信先のメールアドレスが正しくありません。');
         } else {
-            $mail = build_invite_mail($event, 'TESTTOKEN0000000000000000000000000000000');
+            // 本番と同じ文面を送りつつ、リンクだけはスタッフが開けるプレビューにする
+            // （来場者ごとのトークンはこの時点ではまだ発行されていないため）
+            $mail = build_invite_mail($event, 'preview-' . $eventId);
+            $body = "※ これは管理画面からのテスト送信です。以下のリンクはスタッフ確認用のプレビューで、\n"
+                . "　 主催者としてログインした状態で開けます。来場者にはその方専用のURLが届きます。\n\n"
+                . $mail['body'];
             try {
-                send_mail($to, '[テスト] ' . $mail['subject'], $mail['body']);
+                send_mail($to, '[テスト] ' . $mail['subject'], $body);
                 flash_set('success', mail_is_configured()
                     ? 'テストメールを送信しました（' . mail_transport_label() . '）。'
                     : '送信方式が未設定のため、logs/mail-dryrun.log に書き出しました。');

@@ -681,11 +681,36 @@ $res = request('POST', '/admin/invites.php', [
 ], 'org');
 check('test mail is accepted', $res['status'] === 302);
 
+// テスト送信のリンクは、スタッフが実際に開けるプレビューであること
+$previewPath = '/o/preview-' . $eventId;
+
+$res = request('GET', $previewPath, null, 'org');
+check('the preview link opens for the organizer',
+    $res['status'] === 200 && str_contains($res['body'], 'TEST OVERALL'), 'status=' . $res['status']);
+check('the preview is clearly marked', str_contains($res['body'], 'プレビュー'));
+check('the preview cannot be submitted', str_contains($res['body'], 'プレビューのため送信できません'));
+
+$res = request('GET', $previewPath, null, 'nocookie');
+check('the preview asks a logged-out visitor to sign in',
+    $res['status'] === 403 && str_contains($res['body'], 'ログインが必要'), 'status=' . $res['status']);
+
+$res = request('GET', $previewPath, null, 'co');
+check('a company user cannot open the preview', $res['status'] === 403);
+
+$res = request('POST', '/submit.php', [
+    'survey_id'            => (string) $overallId,
+    't'                    => 'preview-' . $eventId,
+    'q[' . $overallQ . ']' => '5',
+], 'org', ['Accept: application/json']);
+check('the preview token cannot be used to answer', $res['status'] === 400);
+
 // filesize() は stat キャッシュに載るため、内容で確かめる
 clearstatcache(true, $logFile);
 $logBody = is_file($logFile) ? (string) file_get_contents($logFile) : '';
 check('test mail is written to the dry-run log', str_contains($logBody, $testMail));
-check('the dry-run log holds the survey link', str_contains($logBody, '/o/TESTTOKEN'));
+// ログは追記されるので、今回のイベント固有のURLで確認する（古い行で通らないように）
+check('the dry-run log holds the preview link', str_contains($logBody, '/o/preview-' . $eventId));
+check('the test mail says it is a test', str_contains($logBody, 'テスト送信'));
 
 // メッセージの組み立て（postfix に渡す内容とSMTPで送る内容は同じ）
 $message = build_mail_message('no-reply@example.jp', 'イベント事務局', 'to@example.jp', '件名テスト', "本文\n2行目");

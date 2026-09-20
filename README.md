@@ -223,6 +223,17 @@ sendmailコマンドが使えない環境でpostfixに渡したいときは、�
 `SMTP_HOST=127.0.0.1` / `SMTP_PORT=25` / `SMTP_SECURE=none`（認証なし）を指定すれば、
 同じローカルpostfixに中継させられます。
 
+### テスト送信について
+
+「全体アンケート」ページの**テスト送信**は、本番と同じ文面を指定のアドレスへ送ります。
+ただし**リンクだけはスタッフ確認用のプレビュー**（`/o/preview-<イベントID>`）です。
+案内メールのURLは来場者ごとに発行されるトークンを含むため、送信前の時点では本物のURLが存在しないためです。
+
+- プレビューは**主催者としてログインした状態**で開きます（ログインしていないと案内ページが出ます）。
+  設問の見え方・文面・`BASE_URL` が正しいかの確認に使えます。
+- プレビュー画面からは**送信できません**（回答が集計に混ざらないようにするため）。
+- 来場者に届く本番のメールには、その方専用のURLが入り、回答すると壁紙のダウンロード画面に進みます。
+
 ### 3. 送信しない（開発・動作確認）
 
 `MAIL_TRANSPORT=log` にすると、送信せず `logs/mail-dryrun.log` に本文を書き出します。
@@ -264,7 +275,7 @@ serve.cmd                                          REM http://127.0.0.1:8080/
 ```
 C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（53項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（159項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（166項目）
 node tests\scan_test.js                                   REM QR読み取り判定（17項目・Nodeがある場合のみ）
 ```
 

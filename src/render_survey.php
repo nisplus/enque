@@ -21,6 +21,7 @@ require_once __DIR__ . '/view.php';
  *   invalid: list<int>,
  *   error: ?string,
  *   email_value: string,
+ *   preview?: bool,
  *   footer_note: ?string
  * } $view
  */
@@ -30,6 +31,7 @@ function render_survey_page(array $view): void
     $company   = $view['company'];
     $survey    = $view['survey'];
     $questions = $view['questions'];
+    $preview   = ($view['preview'] ?? false) === true;
 
     $title = (string) $survey['title'] . '｜' . (string) $event['name'];
     page_header($title, ['brand' => (string) $event['name']]);
@@ -45,6 +47,11 @@ function render_survey_page(array $view): void
 
     if ($view['error'] !== null) {
         echo '<div class="alert alert-error">' . e($view['error']) . '</div>';
+    }
+
+    if ($preview) {
+        echo '<div class="alert alert-warn">スタッフ確認用のプレビューです。';
+        echo 'この画面からは送信できません（回答は保存されません）。</div>';
     }
 
     echo '<div class="progress"><span id="progress-text">' . count($questions) . '問中 0問に回答</span>';
@@ -75,7 +82,12 @@ function render_survey_page(array $view): void
     }
 
     echo '<div class="btn-row">';
-    echo '<button type="submit" class="btn btn-primary btn-block" data-submit data-label="回答を送信する">回答を送信する</button>';
+    if ($preview) {
+        echo '<button type="button" class="btn btn-block" disabled aria-disabled="true">'
+            . 'プレビューのため送信できません</button>';
+    } else {
+        echo '<button type="submit" class="btn btn-primary btn-block" data-submit data-label="回答を送信する">回答を送信する</button>';
+    }
     echo '</div>';
     if ($view['footer_note'] !== null) {
         echo '<p class="muted">' . e($view['footer_note']) . '</p>';
