@@ -37,7 +37,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
-page_header('ログイン｜管理画面');
+page_header('ログイン｜' . admin_title(), ['brand' => admin_title()]);
 
 echo '<h1>管理画面ログイン</h1>';
 if ($error !== null) {

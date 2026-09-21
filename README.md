@@ -98,6 +98,7 @@ enque/
 │   ├── purge_emails.php        メールアドレスの削除（CLI/cron）
 │   ├── bench.php               回答送信の負荷試験（CLI）
 │   ├── seed_traffic.php        画面確認用のダミー周遊データ（CLI・開発用）
+│   ├── reset.sh                データの初期化（回答のみ／運用データすべて）
 │   └── router.php              開発サーバー用ルーター
 ├── storage/wallpapers/         壁紙の実体（DocumentRoot外・要書き込み権限）
 ├── tests/
@@ -151,6 +152,13 @@ sudo cp deploy/cron-enque /etc/cron.d/enque
 `.env` の `DISPLAY_ERRORS` は本番では必ず `0`、HTTPS運用なら `SESSION_SECURE=1` にします。
 **`BASE_URL` はQRコードとメールに埋め込まれるため、QRを印刷する前に必ず本番URLへ設定してください。**
 
+管理画面の見出し（既定は「周遊アンケート管理」）は `.env` の `ADMIN_TITLE` で変えられます。
+ヘッダーとブラウザのタブ名の両方に反映されます。
+
+```ini
+ADMIN_TITLE=◯◯フェア2026 運営
+```
+
 ## 更新（デプロイ）とデータベースのマイグレーション
 
 稼働中のサーバーを新しい版に更新する手順です。**回答や企業・設問などの既存データは消えません。**
@@ -185,6 +193,41 @@ mysql -u root -p enque -e "SHOW TABLES; SHOW COLUMNS FROM prize_claims;"
   受付画面に「景品を選ばずに記録された交換が n 件あります」と表示されます。
 - 今後スキーマを変更するときは `sql/schema.sql`（新規構築用）と `sql/migrate_*.sql`（既存DB用）の
   両方を更新し、この表に1行足します。
+
+## データの初期化
+
+テスト用に入れたデータを消すときや、次のイベントに向けてまっさらにするときは
+`bin/reset.sh` を使います（**管理ユーザーと `.env` は消しません**）。
+
+```bash
+cd /var/www/enque
+
+# 何件消えるかだけを確認する（消さない）
+bin/reset.sh --responses --dry-run
+
+# 回答と回答者のデータだけ消す（イベント・企業・設問・景品・壁紙は残る）
+bin/reset.sh --responses --force
+
+# イベント・企業・設問・回答など、運用データをすべて消す
+bin/reset.sh --all --force
+
+# 特定のイベントだけを対象にする
+bin/reset.sh --all --event=3 --force
+```
+
+| モード | 消えるもの | 残るもの |
+|---|---|---|
+| `--responses` | 回答・回答内容・来場者・交換コード・案内メール | イベント・企業・設問・景品・壁紙・管理ユーザー |
+| `--all` | 上記に加えて、イベント・企業・設問・景品・壁紙（と壁紙の画像ファイル） | 管理ユーザー（主催者・受付）・`.env` |
+
+- 実行には `--force` が必要で、さらに**データベース名の入力を求めます**（`--yes` で省略可）。
+- 実行前に**自動でバックアップ**を取ります（`backups/` に保存。`--no-backup` で省略可）。
+  戻すときは `mysql enque < backups/enque_YYYYMMDD_HHMMSS.sql` です。
+- `--all` では、**企業担当者のアカウントは企業と一緒に消えます**（主催者・受付は残ります）。
+- Windows（Git Bash）で実行する場合は、mysql の場所を環境変数で指定できます。
+  ```
+  MYSQL_BIN=/c/xampp/mysql/bin/mysql.exe MYSQLDUMP_BIN=/c/xampp/mysql/bin/mysqldump.exe bash bin/reset.sh --responses --dry-run
+  ```
 
 ## メール送信の設定
 
@@ -309,7 +352,7 @@ C:\xampp\php\php.exe bin\seed_traffic.php --force --visitors=200
 ```
 C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（53項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（197項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（210項目）
 node tests\scan_test.js                                   REM QR読み取り判定（17項目・Nodeがある場合のみ）
 ```
 

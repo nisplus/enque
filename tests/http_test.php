@@ -998,6 +998,74 @@ $claim2 = find_claim_by_code($claimCode2);
 $visitor2Row = find_visitor((int) $claim2['visitor_id']);
 check('the email lands on the right visitor', (string) ($visitor2Row['email'] ?? '') === $lateEmail);
 
+echo "=== admin title ===\n";
+
+$res = request('GET', '/admin/index.php', null, 'org');
+check('the admin header shows the configured title', str_contains($res['body'], admin_title()));
+check('the browser title uses the same name', str_contains($res['body'], '<title>') && str_contains($res['body'], admin_title()));
+
+$res = request('GET', '/admin/login.php', null, 'nocookie');
+check('the login page shows the configured title too', str_contains($res['body'], admin_title()));
+
+echo "=== reset script ===\n";
+
+// 初期化スクリプトは --event で範囲を限定できる。他のデータに触れないことを、
+// このテスト専用のイベントで確かめる（開発DBの他のデータは消さない）。
+$resetEventId = create_event('TEST RESET ' . $stamp, date('Y-m-d'), date('Y-m-d'), 'open');
+$resetCompany = find_company(create_company($resetEventId, 'RESET CO ' . $stamp, null, null, null));
+$resetSurvey  = ensure_company_survey($resetCompany);
+replace_questions((int) $resetSurvey['id'], [
+    ['id' => null, 'type' => 'single', 'label' => '設問', 'options' => ['はい', 'いいえ'], 'required' => false],
+]);
+update_survey((int) $resetSurvey['id'], 'RESET SURVEY', null, true);
+$resetVisitor = find_or_create_visitor($resetEventId, str_repeat('a', 64));
+insert_response((int) $resetSurvey['id'], (int) $resetVisitor['id'], []);
+find_or_create_claim((int) $resetVisitor['id']);
+
+$bash = trim((string) @shell_exec('bash --version 2>' . (DIRECTORY_SEPARATOR === '\\' ? 'NUL' : '/dev/null')));
+if ($bash === '') {
+    echo "[SKIP] bash が見つからないため、初期化スクリプトの確認は省略します\n";
+} else {
+    $script = str_replace('\\', '/', dirname(__DIR__)) . '/bin/reset.sh';
+
+    // Windows の shell_exec は cmd.exe 経由で、"VAR=値 コマンド" の書き方が使えないため
+    // 環境変数は putenv で渡す（子プロセスが引き継ぐ）
+    putenv('MYSQL_BIN=' . (DIRECTORY_SEPARATOR === '\\' ? '/c/xampp/mysql/bin/mysql.exe' : 'mysql'));
+    putenv('MYSQLDUMP_BIN=' . (DIRECTORY_SEPARATOR === '\\' ? '/c/xampp/mysql/bin/mysqldump.exe' : 'mysqldump'));
+
+    $run = static function (string $options) use ($script): string {
+        return (string) @shell_exec('bash ' . escapeshellarg($script) . ' ' . $options . ' 2>&1');
+    };
+
+    // --dry-run は件数を出すだけで、何も消さない
+    $output = $run('--responses --event=' . $resetEventId . ' --dry-run');
+    check('dry run reports the event it targets', str_contains($output, 'RESET CO ' . $stamp)
+        || str_contains($output, 'TEST RESET ' . $stamp), mb_substr($output, 0, 120));
+    check('dry run keeps the data', count_responses((int) $resetSurvey['id']) === 1);
+
+    // --responses は回答と来場者だけを消し、イベント・企業・設問は残す
+    $output = $run('--responses --event=' . $resetEventId . ' --force --yes --no-backup');
+    check('responses reset removes the answers', count_responses((int) $resetSurvey['id']) === 0, mb_substr($output, 0, 160));
+    check('responses reset removes the visitors and claims',
+        find_visitor((int) $resetVisitor['id']) === null && find_claim_by_code($claimCode) !== null);
+    check('responses reset keeps the event', find_event($resetEventId) !== null);
+    check('responses reset keeps the company and questions',
+        find_company((int) $resetCompany['id']) !== null && questions_for_survey((int) $resetSurvey['id']) !== []);
+    check('responses reset leaves other events alone', count_responses($surveyAId) > 0);
+
+    // --all は指定したイベントだけを丸ごと消す
+    $output = $run('--all --event=' . $resetEventId . ' --force --yes --no-backup');
+    check('full reset removes the event', find_event($resetEventId) === null, mb_substr($output, 0, 160));
+    check('full reset removes its companies', find_company((int) $resetCompany['id']) === null);
+    check('full reset leaves other events alone', find_event($eventId) !== null && count_responses($surveyAId) > 0);
+}
+
+// 消えていなければ後片付け（bash が無い環境でも残さない）
+if (find_event($resetEventId) !== null) {
+    $cleanup = db()->prepare('DELETE FROM events WHERE id = ?');
+    $cleanup->execute([$resetEventId]);
+}
+
 echo "=== login rate limit ===\n";
 
 db()->exec('DELETE FROM admin_login_attempts');

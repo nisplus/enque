@@ -115,6 +115,8 @@ function config(): array
             'user' => (string) env('DB_USER', 'root'),
             'pass' => (string) env('DB_PASS', ''),
         ],
+        // 管理画面のヘッダーとタイトルに出す名前（イベントや主催者に合わせて変えられる）
+        'admin_title'          => (string) env('ADMIN_TITLE', '周遊アンケート管理'),
         // QR・メールに埋め込む公開URL（未設定ならリクエストから推定する）
         'base_url'             => rtrim((string) env('BASE_URL', ''), '/'),
         'pretty_urls'          => env_bool('PRETTY_URLS', true),
@@ -144,6 +146,12 @@ function config(): array
     ];
 
     return $config;
+}
+
+/** 管理画面のヘッダーとタイトルに出す名前（.env の ADMIN_TITLE で変えられる） */
+function admin_title(): string
+{
+    return config()['admin_title'];
 }
 
 /**

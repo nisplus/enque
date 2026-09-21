@@ -41,7 +41,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
-page_header('初回セットアップ｜管理画面');
+page_header('初回セットアップ｜' . admin_title(), ['brand' => admin_title()]);
 
 echo '<h1>初回セットアップ</h1>';
 echo '<p>主催者（全体管理者）のアカウントを作成します。この画面は最初の1回だけ使えます。</p>';

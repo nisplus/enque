@@ -64,12 +64,13 @@ function admin_page_header(array $user, string $title, string $current = ''): vo
     }
     $nav[] = ['href' => 'logout.php', 'label' => 'ログアウト（' . (string) $user['display_name'] . '）'];
 
-    page_header($title . '｜管理画面', [
-        'brand' => '周遊アンケート管理',
+    page_header($title . '｜' . admin_title(), [
+        'brand' => admin_title(),
         'nav'   => $nav,
         'wide'  => true,
     ]);
 }
+
 
 /** 数値タイル */
 function render_stat(string $label, string $value, ?string $note = null): void

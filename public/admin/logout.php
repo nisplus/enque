@@ -14,7 +14,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
 $user = require_admin();
 
-page_header('ログアウト｜管理画面');
+page_header('ログアウト｜' . admin_title(), ['brand' => admin_title()]);
 echo '<h1>ログアウトしますか？</h1>';
 echo '<form method="post" class="card">';
 echo csrf_field();
