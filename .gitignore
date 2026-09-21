@@ -3,3 +3,4 @@
 /storage/wallpapers/*
 !/storage/wallpapers/.gitkeep
 /backups/
+/node_modules/

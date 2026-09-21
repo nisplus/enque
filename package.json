@@ -1,0 +1,11 @@
+{
+  "name": "enque-manuals",
+  "private": true,
+  "description": "マニュアル（docs/manual-*.pptx）を作るためだけの依存。アプリ本体の動作・デプロイに Node.js は不要です。",
+  "scripts": {
+    "manuals": "node bin/build_manuals.js"
+  },
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}

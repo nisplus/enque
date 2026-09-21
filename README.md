@@ -99,12 +99,14 @@ enque/
 │   ├── bench.php               回答送信の負荷試験（CLI）
 │   ├── seed_traffic.php        画面確認用のダミー周遊データ（CLI・開発用）
 │   ├── reset.sh                データの初期化（回答のみ／運用データすべて）
+│   ├── build_manuals.js        docs/manual-*.md から A4縦の pptx を生成
 │   └── router.php              開発サーバー用ルーター
 ├── storage/wallpapers/         壁紙の実体（DocumentRoot外・要書き込み権限）
 ├── tests/
 │   ├── unit_test.php           QR・検証・CSVの単体テスト（DB不要）
 │   ├── http_test.php           受け入れ条件のE2Eテスト
 │   └── scan_test.js            受付のQR読み取り判定のテスト（Nodeがあるときのみ・任意）
+├── docs/                       マニュアル（原稿の .md と生成物の .pptx）
 ├── deploy/apache-enque.conf    Apache設定サンプル
 ├── deploy/cron-enque           cron設定サンプル
 ├── .env.example                環境変数のテンプレート
@@ -193,6 +195,30 @@ mysql -u root -p enque -e "SHOW TABLES; SHOW COLUMNS FROM prize_claims;"
   受付画面に「景品を選ばずに記録された交換が n 件あります」と表示されます。
 - 今後スキーマを変更するときは `sql/schema.sql`（新規構築用）と `sql/migrate_*.sql`（既存DB用）の
   両方を更新し、この表に1行足します。
+
+## マニュアル（主催者・企業担当者・総合受付）
+
+`docs/` に3つのマニュアルがあります。**A4縦のPowerPoint**で、そのまま印刷・配布できます。
+
+| ファイル | 対象 | ページ数 |
+|---|---|---|
+| `docs/manual-organizer.pptx` | 主催者（事務局） | 19 |
+| `docs/manual-company.pptx` | 企業担当者 | 9 |
+| `docs/manual-reception.pptx` | 総合受付 | 8 |
+
+**原稿は `docs/manual-*.md` が正で、pptx は生成物です。** 文章を直すときは Markdown を編集して
+作り直してください（画面が変わったときも同じ手順で更新できます）。
+
+```
+npm install                  REM 初回のみ。pptxgenjs を入れる
+node bin/build_manuals.js    REM 3本の pptx と screenshot-list.md を作り直す
+```
+
+- **スクリーンショットは入っていません。** 各所に点線の枠と「何を撮るか」の説明を置いてあるので、
+  本番サイトで撮影して貼り付けてください。貼る場所の一覧は `docs/screenshot-list.md`（全27箇所）です。
+- Node.js が必要なのは**このマニュアル生成だけ**で、アプリ本体の動作・デプロイには不要です。
+- 原稿の書き方（見出し・手順・メモ・注意・スクショ枠の記法）は `bin/build_manuals.js` の冒頭に
+  書いてあります。
 
 ## データの初期化
 
