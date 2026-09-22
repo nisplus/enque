@@ -389,6 +389,111 @@ function participation_rates(int $eventId): array
     ];
 }
 
+/**
+ * 来場人数（「何人で来られましたか」の回答）の集計。
+ *
+ * 任意回答のため、未回答ぶんは次の順で値を補う：
+ *   1. その回答自身の人数
+ *   2. 同じ来場者が別の企業で答えた人数（持ち越し）
+ *   3. それも無ければ、回答があったぶんの平均
+ *
+ * のべ来場者は「回答1件ごとの人数」を足したもの（1組が3社回れば3回数える）。
+ * 実来場者は「来場者ごとに1回だけ」足したもの。
+ *
+ * @return array{
+ *   configured: bool, responses: int, answered: int, answer_rate: float,
+ *   average: float, total_visits: int, unique_people: int,
+ *   answered_visitors: int, visitors: int, distribution: array<string,int>
+ * }
+ */
+function party_size_stats(int $eventId): array
+{
+    $empty = [
+        'configured' => party_size_questions($eventId) !== [],
+        'responses' => 0, 'answered' => 0, 'answer_rate' => 0.0, 'average' => 0.0,
+        'total_visits' => 0, 'unique_people' => 0, 'answered_visitors' => 0, 'visitors' => 0,
+        'distribution' => [],
+    ];
+
+    // 企業アンケートの有効回答を、来場人数の回答とあわせて取り出す
+    $stmt = db()->prepare(
+        "SELECT r.id AS response_id, r.visitor_id, a.value
+         FROM responses r
+         JOIN surveys s ON s.id = r.survey_id
+         LEFT JOIN questions q ON q.survey_id = s.id AND q.metric = 'party_size'
+         LEFT JOIN answers a  ON a.response_id = r.id AND a.question_id = q.id
+         WHERE s.event_id = ? AND s.type = 'company' AND r.is_duplicate = 0"
+    );
+    $stmt->execute([$eventId]);
+    $rows = $stmt->fetchAll();
+
+    if ($rows === []) {
+        return $empty;
+    }
+
+    // 1. 回答があったものを集める（来場者ごとの持ち越し値も作る）
+    $values       = [];
+    $byVisitor    = [];
+    $answered     = 0;
+    $distribution = [];
+    foreach ($rows as $row) {
+        $visitorId = (int) $row['visitor_id'];
+        $value     = $row['value'] === null || $row['value'] === '' ? null : (int) $row['value'];
+        $values[]  = ['visitor_id' => $visitorId, 'value' => $value];
+        if ($value === null) {
+            continue;
+        }
+        $answered++;
+        $byVisitor[$visitorId] ??= $value;
+        $key = $value . '人';
+        $distribution[$key] = ($distribution[$key] ?? 0) + 1;
+    }
+
+    $responses = count($values);
+    if ($answered === 0) {
+        $empty['responses'] = $responses;
+        $empty['visitors']  = count(array_unique(array_column($values, 'visitor_id')));
+        return $empty;
+    }
+
+    // 2. 回答があったぶんの平均（未回答を埋めるのに使う）
+    $sumAnswered = 0;
+    foreach ($values as $row) {
+        if ($row['value'] !== null) {
+            $sumAnswered += $row['value'];
+        }
+    }
+    $average = $sumAnswered / $answered;
+
+    // 3. のべ来場者：回答ごとに、自分の回答 → 持ち越し → 平均 の順で当てはめる
+    $totalVisits = 0.0;
+    foreach ($values as $row) {
+        $totalVisits += $row['value'] ?? ($byVisitor[$row['visitor_id']] ?? $average);
+    }
+
+    // 4. 実来場者：来場者ごとに1回だけ数える
+    $visitorIds   = array_values(array_unique(array_column($values, 'visitor_id')));
+    $uniquePeople = 0.0;
+    foreach ($visitorIds as $visitorId) {
+        $uniquePeople += $byVisitor[$visitorId] ?? $average;
+    }
+
+    ksort($distribution, SORT_NATURAL);
+
+    return [
+        'configured'        => true,
+        'responses'         => $responses,
+        'answered'          => $answered,
+        'answer_rate'       => percentage($answered, $responses),
+        'average'           => round($average, 2),
+        'total_visits'      => (int) round($totalVisits),
+        'unique_people'     => (int) round($uniquePeople),
+        'answered_visitors' => count($byVisitor),
+        'visitors'          => count($visitorIds),
+        'distribution'      => $distribution,
+    ];
+}
+
 /** 秒数を「1時間23分」のように読みやすくする */
 function format_duration(float $seconds): string
 {

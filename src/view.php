@@ -157,6 +157,22 @@ function render_question(array $question, array $previous = [], bool $invalid = 
             echo '</div>';
             break;
 
+        case QuestionType::Number: {
+            $settings = number_settings($question);
+            $value    = is_string($old) ? trim($old) : '';
+            echo '<div class="number-field">';
+            echo '<input type="number" name="' . e($name) . '" value="' . e($value) . '" '
+                . 'min="' . $settings['min'] . '" max="' . $settings['max'] . '" step="1" '
+                . 'inputmode="numeric" pattern="[0-9]*">';
+            echo '<span class="number-unit">' . e($settings['unit']) . '</span>';
+            echo '</div>';
+            if ($value !== '') {
+                // 2社目以降は、前の企業で答えた人数をあらかじめ入れておく
+                echo '<p class="muted">前にご回答いただいた人数を入れてあります。違う場合は書き換えてください。</p>';
+            }
+            break;
+        }
+
         default:
             echo '<p class="field-error">この設問は表示できません。</p>';
     }

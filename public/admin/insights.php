@@ -72,6 +72,29 @@ echo '<div class="alert alert-info">「周回時間」は<strong>最初の回答
 echo '入場から1社目まで、最後のブースから退場までは含みません。';
 echo '1社だけ回った方（' . $lapTime['single_company_visitors'] . '人）は時間が0になるため、時間の集計から除いています。</div>';
 
+// ---------------------------------------------------------------- 来場人数
+$party = party_size_stats($eventId);
+if ($party['configured']) {
+    echo '<h2>来場人数（何人で来られたか）</h2>';
+    echo '<div class="card">';
+    if ($party['answered'] === 0) {
+        echo '<p class="muted">まだ人数の回答がありません。</p>';
+    } else {
+        echo '<div class="stat-grid">';
+        render_stat('のべ来場者', count_label($party['total_visits'], '人'), '各回答の人数の合計');
+        render_stat('実来場者（推計）', count_label($party['unique_people'], '人'), '1人1回として数えた人数');
+        render_stat('平均人数', (string) $party['average'] . '人', '1回答あたり');
+        render_stat('回答率', $party['answer_rate'] . '%',
+            $party['answered'] . ' / ' . $party['responses'] . '件');
+        echo '</div>';
+        echo svg_bar_chart($party['distribution'], $party['answered']);
+        echo '<p class="muted">人数は任意回答のため、未回答のぶんは';
+        echo '<strong>同じ来場者が別の企業で答えた人数</strong>、それも無ければ';
+        echo '<strong>回答があったぶんの平均（' . $party['average'] . '人）</strong>を当てはめて計算しています。</p>';
+    }
+    echo '</div>';
+}
+
 // ---------------------------------------------------------------- 周回企業数
 echo '<h2>1人あたりの周回企業数</h2>';
 echo '<div class="card">';

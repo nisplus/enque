@@ -220,6 +220,24 @@ function questions_for_survey(int $surveyId): array
 }
 
 /**
+ * 来場人数として集計する設問があるか（イベント内の企業アンケート）。
+ *
+ * @return list<array<string,mixed>>
+ */
+function party_size_questions(int $eventId): array
+{
+    $stmt = db()->prepare(
+        "SELECT q.* FROM questions q
+         JOIN surveys s ON s.id = q.survey_id
+         WHERE s.event_id = ? AND s.type = 'company' AND q.metric = 'party_size'
+         ORDER BY q.id"
+    );
+    $stmt->execute([$eventId]);
+
+    return $stmt->fetchAll();
+}
+
+/**
  * 設問を丸ごと置き換える。
  *
  * 既存の設問IDが送られてきたものは UPDATE、無くなったものは DELETE する
@@ -236,24 +254,31 @@ function replace_questions(int $surveyId, array $questions): void
 
         foreach ($questions as $q) {
             $order++;
-            $options = $q['options'] === []
-                ? null
-                : json_encode(array_values($q['options']), JSON_UNESCAPED_UNICODE);
+            // 数値入力は {"min":…,"max":…,"unit":"人"}、選択式は選択肢の配列として保存する
+            if (($q['type'] ?? '') === 'number') {
+                $options = json_encode($q['number'] ?? NUMBER_DEFAULTS, JSON_UNESCAPED_UNICODE);
+            } else {
+                $options = $q['options'] === []
+                    ? null
+                    : json_encode(array_values($q['options']), JSON_UNESCAPED_UNICODE);
+            }
+            $metric = ($q['metric'] ?? 'none') === 'party_size' ? 'party_size' : 'none';
 
             if ($q['id'] !== null) {
                 $stmt = db()->prepare(
-                    'UPDATE questions SET type = ?, label = ?, options = ?, required = ?, sort_order = ?
+                    'UPDATE questions SET type = ?, label = ?, options = ?, required = ?, metric = ?, sort_order = ?
                      WHERE id = ? AND survey_id = ?'
                 );
-                $stmt->execute([$q['type'], $q['label'], $options, $q['required'] ? 1 : 0, $order, $q['id'], $surveyId]);
+                $stmt->execute([$q['type'], $q['label'], $options, $q['required'] ? 1 : 0, $metric, $order, $q['id'], $surveyId]);
                 $keepIds[] = (int) $q['id'];
                 continue;
             }
 
             $stmt = db()->prepare(
-                'INSERT INTO questions (survey_id, type, label, options, required, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+                'INSERT INTO questions (survey_id, type, label, options, required, metric, sort_order)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$surveyId, $q['type'], $q['label'], $options, $q['required'] ? 1 : 0, $order]);
+            $stmt->execute([$surveyId, $q['type'], $q['label'], $options, $q['required'] ? 1 : 0, $metric, $order]);
             $keepIds[] = (int) db()->lastInsertId();
         }
 
@@ -444,6 +469,28 @@ function answers_for_responses(array $responseIds): array
     }
 
     return $map;
+}
+
+/**
+ * その来場者が、別の企業で答えた来場人数（無ければ null）。
+ *
+ * 2社目以降の回答画面に初期値として出し、集計でも持ち越して使う。
+ */
+function visitor_party_size(int $visitorId): ?int
+{
+    $stmt = db()->prepare(
+        "SELECT a.value
+         FROM answers a
+         JOIN questions q  ON q.id = a.question_id
+         JOIN responses r  ON r.id = a.response_id
+         WHERE r.visitor_id = ? AND q.metric = 'party_size' AND a.value IS NOT NULL AND a.value <> ''
+         ORDER BY r.submitted_at DESC, r.id DESC
+         LIMIT 1"
+    );
+    $stmt->execute([$visitorId]);
+    $value = $stmt->fetchColumn();
+
+    return $value === false ? null : (int) $value;
 }
 
 /** その来場者が回答した企業数（重複を除く） */

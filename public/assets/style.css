@@ -328,3 +328,8 @@ details.answers-detail summary { cursor: pointer; color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* 数値入力（来場人数など） ---------------------------------------------------- */
+.number-field { display: flex; align-items: center; gap: 10px; max-width: 220px; }
+.number-field input { font-size: 1.3rem; text-align: center; padding: 12px; }
+.number-unit { font-size: 1.05rem; color: var(--text-secondary); white-space: nowrap; }

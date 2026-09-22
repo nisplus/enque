@@ -169,9 +169,19 @@ echo '<h2>' . e((string) $event['name']) . '<span class="badge badge-'
     . e(event_status_label((string) $event['status'])) . '</span></h2>';
 
 echo '<div class="stat-grid">';
+$party = party_size_stats($eventId);
+
 render_stat('ユニーク来場者', count_label($summary['visitors'], '人'), 'アンケートを開いた端末数');
-render_stat('回答した来場者', count_label($summary['responding_visitors'], '人'));
-render_stat('のべ来場者', count_label($summary['visits'], '人'), '各企業の回答者数の合計');
+render_stat('回答した来場者', count_label($summary['responding_visitors'], '人'), '端末の数（人数の申告は含まない）');
+if ($party['configured'] && $party['answered'] > 0) {
+    render_stat('のべ来場者', count_label($party['total_visits'], '人'),
+        '各回答の人数の合計（回答率 ' . $party['answer_rate'] . '%）');
+    render_stat('実来場者（推計）', count_label($party['unique_people'], '人'),
+        '1人1回として数えた人数');
+} else {
+    render_stat('のべ来場者', '—', '来場人数の設問が未設定です');
+}
+render_stat('のべ訪問数', count_label($summary['visits'], '件'), '各企業の回答者数の合計');
 render_stat('総回答数', count_label($summary['responses']), '重複' . $summary['duplicates'] . '件を除く');
 render_stat('平均訪問企業数', (string) $summary['avg_companies'] . '社', '1人あたり');
 render_stat('メール登録', count_label($summary['emails'], '人'), '総合アンケートの案内先');
@@ -220,7 +230,7 @@ if ($ranking !== []) {
     echo '<th class="num">' . array_sum(array_column($ranking, 'responses')) . '</th>';
     echo '<th class="num">' . $summary['visits'] . '</th>';
     echo '<th class="num muted">' . array_sum(array_column($ranking, 'duplicates')) . '</th>';
-    echo '<th class="muted">のべ来場者</th>';
+    echo '<th class="muted">のべ訪問数</th>';
     echo '</tr></tfoot>';
 }
 echo '</table></div>';

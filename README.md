@@ -187,6 +187,7 @@ mysql -u root -p enque -e "SHOW TABLES; SHOW COLUMNS FROM prize_claims;"
 | ファイル | 内容 | いつ必要か |
 |---|---|---|
 | `sql/migrate_prizes.sql` | `prizes` テーブルの追加と、`prize_claims.prize_id`（渡した景品）の追加 | 景品機能より前に `sql/schema.sql` でDBを作った場合 |
+| `sql/migrate_party_size.sql` | 設問の種類に「数値入力」を追加し、`questions.metric`（来場人数として集計するか）を追加 | 来場人数の集計より前に `sql/schema.sql` でDBを作った場合 |
 
 - **新規に構築する場合は `sql/schema.sql` だけで足ります**（マイグレーションは不要です）。
 - マイグレーションは `IF NOT EXISTS` で書いてあるので、**二度流しても壊れません**。
@@ -379,7 +380,7 @@ C:\xampp\php\php.exe bin\seed_traffic.php --force --visitors=200
 ```
 C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（53項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（210項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（233項目）
 node tests\scan_test.js                                   REM QR読み取り判定（17項目・Nodeがある場合のみ）
 ```
 

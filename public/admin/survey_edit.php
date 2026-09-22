@@ -57,13 +57,18 @@ function parse_posted_questions(): array
         $options = QuestionType::from($type)->hasOptions()
             ? parse_options_text((string) ($row['options'] ?? ''))
             : [];
+        // 数値入力は同じ欄を「min=1 / max=99 / unit=人」の設定として読む
+        $number = $type === 'number' ? parse_number_settings_text((string) ($row['options'] ?? '')) : null;
 
         $questions[] = [
             'id'       => isset($row['id']) && (int) $row['id'] > 0 ? (int) $row['id'] : null,
             'type'     => $type,
             'label'    => mb_substr($label, 0, 500),
             'options'  => $options,
+            'number'   => $number,
             'required' => ($row['required'] ?? '') === '1',
+            // 来場人数として集計するかどうか（数値入力のときだけ有効）
+            'metric'   => $type === 'number' && ($row['metric'] ?? '') === 'party_size' ? 'party_size' : 'none',
             'sort'     => (int) ($row['sort'] ?? $index),
         ];
     }
@@ -118,7 +123,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 'type'     => $q['type'],
                 'label'    => $q['label'],
                 'options'  => $q['options'],
+                'number'   => $q['number'],
                 'required' => $q['required'],
+                'metric'   => $q['metric'],
             ],
             $questions
         ));
@@ -205,14 +212,35 @@ $render = static function (?array $question, int $index, bool $isNew = false): v
     echo '</select></label>';
     echo '</div>';
 
-    echo '<label class="field">選択肢<span class="hint">1行に1つ。単一選択・複数選択のときだけ使います。</span>';
-    echo '<textarea name="q[' . $index . '][options]" rows="4">' . e(implode("\n", $options)) . '</textarea></label>';
+    // 数値入力のときは、同じ欄を「min= / max= / unit=」の設定として使う
+    $optionText = $type === 'number' && $question !== null
+        ? implode("\n", array_map(
+            static fn(string $k, $v): string => $k . '=' . $v,
+            array_keys(number_settings($question)),
+            array_values(number_settings($question))
+        ))
+        : implode("\n", $options);
+
+    echo '<label class="field">選択肢／数値の設定';
+    echo '<span class="hint">単一選択・複数選択は1行に1つの選択肢。';
+    echo '数値入力のときは <code class="mono">min=1</code> <code class="mono">max=99</code> ';
+    echo '<code class="mono">unit=人</code> のように書きます（省略時は 1〜99・単位「人」）。</span>';
+    echo '<textarea name="q[' . $index . '][options]" rows="4">' . e($optionText) . '</textarea></label>';
 
     echo '<div class="q-grid">';
     echo '<label class="choice"><input type="checkbox" name="q[' . $index . '][required]" value="1"'
         . ($required ? ' checked' : '') . '><span>必須にする</span></label>';
     echo '<label class="field">並び順<input type="number" name="q[' . $index . '][sort]" value="' . ($index + 1) . '"></label>';
     echo '</div>';
+
+    // 来場人数として集計する設問の指定（数値入力のときだけ効く）
+    $isParty = $question !== null && is_party_size_question($question);
+    echo '<label class="choice"><input type="checkbox" name="q[' . $index . '][metric]" value="party_size"'
+        . ($isParty ? ' checked' : '') . '>';
+    echo '<span>この回答を<strong>来場人数</strong>として集計する'
+        . '<span class="hint">「何人で来られましたか」のような設問に付けます。'
+        . 'ダッシュボードの「のべ来場者」に足し上げられます（種類が「数値入力」のときだけ有効）。</span></span></label>';
+
     echo '</div>';
 };
 

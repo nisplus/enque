@@ -878,7 +878,50 @@ $addResponse($v3, 'I-B', $today . ' 12:00:00', '4');
 $addResponse($v3, 'I-A', $today . ' 12:10:00', '4');
 $addResponse($v3, 'I-C', $today . ' 12:40:00', '4');
 
-// のべ来場者＝各企業の回答者数の合計（v1が2社・v2が1社・v3が3社で計6人）
+echo "=== party size ===\n";
+
+// 来場人数の設問（数値入力）を1社目に足し、持ち越しと平均補完を確かめる
+$partySurveyId = $insightCompanies['I-A']['survey_id'];
+$partyExisting = questions_for_survey($partySurveyId);
+replace_questions($partySurveyId, array_merge(
+    [[
+        'id' => null, 'type' => 'number', 'label' => '何人で来られましたか',
+        'options' => [], 'number' => ['min' => 1, 'max' => 20, 'unit' => '人'],
+        'required' => false, 'metric' => 'party_size',
+    ]],
+    array_map(static fn(array $q): array => [
+        'id' => (int) $q['id'], 'type' => (string) $q['type'], 'label' => (string) $q['label'],
+        'options' => question_options($q), 'number' => null,
+        'required' => (int) $q['required'] === 1, 'metric' => (string) $q['metric'],
+    ], $partyExisting)
+));
+$partyQuestion = questions_for_survey($partySurveyId)[0];
+check('the number question is stored', (string) $partyQuestion['type'] === 'number');
+check('the question is marked as the party size', is_party_size_question($partyQuestion));
+check('the number range is kept', number_settings($partyQuestion)['max'] === 20);
+
+// v1 は I-A で「3人」と回答。v2・v3 は未回答
+$partyAnswer = db()->prepare(
+    'INSERT INTO answers (response_id, question_id, value)
+     SELECT r.id, ?, ? FROM responses r WHERE r.survey_id = ? AND r.visitor_id = ? LIMIT 1'
+);
+$partyAnswer->execute([(int) $partyQuestion['id'], '3', $partySurveyId, $v1]);
+
+$party = party_size_stats($insightEventId);
+check('the party size is configured', $party['configured'] === true);
+check('answered responses are counted', $party['answered'] === 1, 'answered=' . $party['answered']);
+check('the answer rate is reported', $party['answer_rate'] === percentage(1, 6), 'rate=' . $party['answer_rate']);
+check('the average comes from the answered responses', $party['average'] === 3.0);
+// v1 は 2社回っており、I-B のぶんは持ち越しで3人。v2（1社）とv3（3社）は平均3人で補う
+check('carried-forward and averaged values fill the gaps', $party['total_visits'] === 18,
+    'total=' . $party['total_visits']);
+check('unique people count each visitor once', $party['unique_people'] === 9,
+    'people=' . $party['unique_people']);
+
+// 回答した人数は分布にも出る
+check('the distribution holds the answered value', ($party['distribution']['3人'] ?? 0) === 1);
+
+// のべ来場者（人数ベース）とは別に、のべ訪問数も残っている
 $insightSummary = event_summary($insightEventId);
 check('total visits counts one per visitor and booth', $insightSummary['visits'] === 6,
     'visits=' . $insightSummary['visits']);

@@ -54,14 +54,19 @@ CREATE TABLE IF NOT EXISTS surveys (
 
 -- 設問 ---------------------------------------------------------------------
 -- options は single/multi のとき ["選択肢1","選択肢2"] のJSON配列。
+-- number のときは {"min":1,"max":99,"unit":"人"} のJSON。
 -- rating は最大値（既定5）、nps は 0-10 固定のため options は使わない。
+--
+-- metric は、その設問の回答を集計指標として扱うかどうか。
+--   party_size … 「何人で来られましたか」のような来場人数。のべ来場者の集計に使う
 CREATE TABLE IF NOT EXISTS questions (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   survey_id  INT UNSIGNED NOT NULL,
-  type       ENUM('single','multi','text','rating','nps') NOT NULL,
+  type       ENUM('single','multi','text','rating','nps','number') NOT NULL,
   label      VARCHAR(500) NOT NULL,
   options    TEXT NULL,
   required   TINYINT(1) NOT NULL DEFAULT 0,
+  metric     ENUM('none','party_size') NOT NULL DEFAULT 'none',
   sort_order INT NOT NULL DEFAULT 0,
   INDEX idx_question_survey (survey_id, sort_order),
   CONSTRAINT fk_question_survey FOREIGN KEY (survey_id) REFERENCES surveys(id) ON DELETE CASCADE

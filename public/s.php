@@ -51,6 +51,18 @@ if (!$available) {
 // 回答画面を開いた時点で来場者セッション（Cookie）を用意する
 $visitor = current_visitor((int) $event['id']);
 
+// 2社目以降は、前の企業で答えた来場人数を初期値として入れておく
+// （毎回入力してもらわずに済み、未回答が減って集計の精度も上がる）
+$previous  = [];
+$partySize = visitor_party_size((int) $visitor['id']);
+if ($partySize !== null) {
+    foreach ($questions as $question) {
+        if (is_party_size_question($question)) {
+            $previous[(int) $question['id']] = (string) $partySize;
+        }
+    }
+}
+
 render_survey_page([
     'event'       => $event,
     'company'     => $company,
@@ -58,7 +70,7 @@ render_survey_page([
     'questions'   => $questions,
     'hidden'      => ['survey_id' => (string) $survey['id']],
     'ask_email'   => ($visitor['email'] ?? null) === null,
-    'previous'    => [],
+    'previous'    => $previous,
     'invalid'     => [],
     'error'       => submit_error_message(get_string('err')),
     'email_value' => '',

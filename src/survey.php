@@ -22,6 +22,7 @@ enum QuestionType: string
     case Text   = 'text';
     case Rating = 'rating';
     case Nps    = 'nps';
+    case Number = 'number';
 
     public function label(): string
     {
@@ -31,6 +32,7 @@ enum QuestionType: string
             self::Text   => '自由記述',
             self::Rating => '評価（星5段階）',
             self::Nps    => 'NPS（0〜10）',
+            self::Number => '数値入力（人数など）',
         };
     }
 
@@ -54,6 +56,48 @@ enum QuestionType: string
 
 /** 星評価の段階数（固定） */
 const RATING_MAX = 5;
+
+/** 数値入力の既定の範囲と単位（設問ごとに options で上書きできる） */
+const NUMBER_DEFAULTS = ['min' => 1, 'max' => 99, 'unit' => '人'];
+
+/**
+ * 数値入力の設定（最小値・最大値・単位）。
+ *
+ * 管理画面では options 欄に「min=1」「max=99」「unit=人」の形で書ける。
+ * 省略した項目は既定値を使う。
+ *
+ * @return array{min: int, max: int, unit: string}
+ */
+function number_settings(array $question): array
+{
+    $settings = NUMBER_DEFAULTS;
+    $decoded  = json_decode((string) ($question['options'] ?? ''), true);
+    if (is_array($decoded)) {
+        foreach (['min', 'max'] as $key) {
+            if (isset($decoded[$key]) && is_numeric($decoded[$key])) {
+                $settings[$key] = (int) $decoded[$key];
+            }
+        }
+        if (isset($decoded['unit']) && is_string($decoded['unit']) && $decoded['unit'] !== '') {
+            $settings['unit'] = mb_substr($decoded['unit'], 0, 8);
+        }
+    }
+    if ($settings['max'] < $settings['min']) {
+        $settings['max'] = $settings['min'];
+    }
+
+    return $settings;
+}
+
+/**
+ * 来場人数として集計する設問か。
+ *
+ * 「何人で来られましたか」のように、回答をそのまま人数として足し上げる設問。
+ */
+function is_party_size_question(array $question): bool
+{
+    return (string) ($question['metric'] ?? 'none') === 'party_size';
+}
 
 /**
  * 設問行の options（JSON文字列）を配列に戻す。
@@ -166,9 +210,18 @@ function validate_answer(array $question, mixed $input): array
 
         case QuestionType::Rating:
         case QuestionType::Nps:
-            $min = $type === QuestionType::Rating ? 1 : 0;
-            $max = $type === QuestionType::Rating ? RATING_MAX : 10;
+        case QuestionType::Number:
+            if ($type === QuestionType::Number) {
+                $settings = number_settings($question);
+                $min = $settings['min'];
+                $max = $settings['max'];
+            } else {
+                $min = $type === QuestionType::Rating ? 1 : 0;
+                $max = $type === QuestionType::Rating ? RATING_MAX : 10;
+            }
             $raw = is_string($input) ? trim_ja($input) : '';
+            // 全角数字で入力されることがあるので半角に直す
+            $raw = (string) mb_convert_kana($raw, 'n');
             if ($raw === '') {
                 return $required ? ['ok' => false, 'error' => 'required'] : ['ok' => true, 'value' => null];
             }
@@ -198,6 +251,7 @@ function format_answer_value(array $question, ?string $value): string
     return match ($type) {
         QuestionType::Multi  => implode(' / ', decode_multi_value($value)),
         QuestionType::Rating => $value . ' / ' . RATING_MAX,
+        QuestionType::Number => $value . number_settings($question)['unit'],
         default              => $value,
     };
 }
@@ -234,4 +288,34 @@ function parse_options_text(string $text): array
     }
 
     return $options;
+}
+
+/**
+ * 数値入力の設定テキスト（min=1 / max=99 / unit=人）を配列にする。
+ *
+ * 管理画面では選択肢と同じ入力欄を使うため、書かれていない項目は既定値のままにする。
+ *
+ * @return array{min: int, max: int, unit: string}
+ */
+function parse_number_settings_text(string $text): array
+{
+    $settings = NUMBER_DEFAULTS;
+    foreach (preg_split('/\R/u', $text) ?: [] as $line) {
+        $line = trim_ja(strip_control_chars($line));
+        if ($line === '' || !str_contains($line, '=')) {
+            continue;
+        }
+        [$key, $value] = array_map('trim', explode('=', $line, 2));
+        $key = strtolower($key);
+        if (($key === 'min' || $key === 'max') && is_numeric($value)) {
+            $settings[$key] = max(0, (int) $value);
+        } elseif ($key === 'unit' && $value !== '') {
+            $settings['unit'] = mb_substr($value, 0, 8);
+        }
+    }
+    if ($settings['max'] < $settings['min']) {
+        $settings['max'] = $settings['min'];
+    }
+
+    return $settings;
 }
