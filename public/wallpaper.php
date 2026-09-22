@@ -36,7 +36,7 @@ $isMobile = $isIos || preg_match('/Android|Mobile/i', $ua) === 1;
 page_header('スマホ壁紙のダウンロード｜' . (string) $event['name'], ['brand' => (string) $event['name']]);
 
 echo '<h1>ご回答ありがとうございました</h1>';
-echo '<p>オリジナルのスマホ壁紙をダウンロードいただけます。</p>';
+echo '<p>はいてくヒルズオリジナルスマホ壁紙をダウンロードいただけます。</p>';
 
 if ($wallpapers === []) {
     echo '<div class="alert alert-info">壁紙は現在準備中です。お手数ですが、しばらくしてからもう一度アクセスしてください。</div>';

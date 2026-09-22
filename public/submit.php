@@ -131,7 +131,7 @@ $view = [
     'invalid'     => [],
     'error'       => null,
     'email_value' => $emailInput,
-    'footer_note' => $type === 'company' ? '送信後、総合受付で提示できる交換コードが表示されます。ほかのブースも同じスマホ・同じブラウザで読み取ると、1つの交換コードにまとまります。' : null,
+    'footer_note' => $type === 'company' ? '送信後、総合受付で提示できる交換コードが表示されます。ほかの参加企業あんけーとでも同じスマホ・同じブラウザで読み取ると、1つの交換コードにまとまります。' : null,
 ];
 
 if (!is_valid_utf8($_POST)) {

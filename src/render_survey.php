@@ -73,8 +73,8 @@ function render_survey_page(array $view): void
     if ($view['ask_email']) {
         echo '<div class="card">';
         echo '<label class="field" for="email">メールアドレス（任意）';
-        echo '<span class="hint">イベント終了後に「全体アンケート」のご案内をお送りします。';
-        echo 'ご回答いただくと、オリジナルのスマホ壁紙をダウンロードできます。';
+        echo '<span class="hint">イベント終了後に「総合アンケート」のご案内をお送りします。';
+        echo 'ご回答いただくと、はいてくヒルズオリジナル壁紙をダウンロードできます。';
         echo '入力は任意で、他の個人情報はお伺いしません。</span></label>';
         echo '<input type="email" id="email" name="email" autocomplete="email" inputmode="email" '
             . 'value="' . e($view['email_value']) . '" placeholder="example@example.jp">';

@@ -28,7 +28,7 @@ $codeParam = normalize_claim_code((string) (get_string('c') ?? (post_string('c')
 /** 画面のどこにでも出す、同じ端末で回ってもらうための案内 */
 function same_device_note(): string
 {
-    return 'ほかのブースも<strong>同じスマホ・同じブラウザ</strong>でQRコードを読み取ってください。'
+    return 'ほかの参加企業のアンケートでも<strong>同じスマホ・同じブラウザ</strong>でQRコードを読み取ってください。'
         . '別の端末で読み取ると、別の交換コードになります。';
 }
 
@@ -134,8 +134,8 @@ if ($error !== null) {
 if (($visitor['email'] ?? null) === null) {
     echo '<div class="card">';
     echo '<h2 style="margin-top:0">スマホ壁紙をご希望の方へ</h2>';
-    echo '<p>イベント終了後に「全体アンケート」のご案内をお送りします。ご回答いただくと、';
-    echo 'オリジナルのスマホ壁紙をダウンロードできます。</p>';
+    echo '<p>イベント終了後に「総合アンケート」のご案内をお送りします。ご回答いただくと、';
+    echo 'はいてくヒルズオリジナル壁紙をダウンロードできます。</p>';
     echo '<form method="post">';
     // コード付きで開いている場合も、送信先を同じ来場者に保つ
     echo '<input type="hidden" name="c" value="' . e($code) . '">';
@@ -146,7 +146,7 @@ if (($visitor['email'] ?? null) === null) {
     echo '</form>';
     echo '</div>';
 } else {
-    echo '<div class="alert alert-info">イベント終了後、ご登録のメールアドレス宛に全体アンケートのご案内をお送りします。</div>';
+    echo '<div class="alert alert-info">イベント終了後、ご登録のメールアドレス宛に総合アンケートのご案内をお送りします。</div>';
 }
 
 // スタッフがログインしていない状態でQRを読み取った場合の逃げ道
