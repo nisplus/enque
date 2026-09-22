@@ -203,8 +203,8 @@ mysql -u root -p enque -e "SHOW TABLES; SHOW COLUMNS FROM prize_claims;"
 | ファイル | 対象 | ページ数 |
 |---|---|---|
 | `docs/manual-organizer.pptx` | 主催者（事務局） | 19 |
-| `docs/manual-company.pptx` | 企業担当者 | 9 |
-| `docs/manual-reception.pptx` | 総合受付 | 8 |
+| `docs/manual-company.pptx` | 企業担当者 | 10 |
+| `docs/manual-reception.pptx` | 総合受付 | 9 |
 
 **原稿は `docs/manual-*.md` が正で、pptx は生成物です。** 文章を直すときは Markdown を編集して
 作り直してください（画面が変わったときも同じ手順で更新できます）。
@@ -214,8 +214,9 @@ npm install                  REM 初回のみ。pptxgenjs を入れる
 node bin/build_manuals.js    REM 3本の pptx と screenshot-list.md を作り直す
 ```
 
-- **スクリーンショットは入っていません。** 各所に点線の枠と「何を撮るか」の説明を置いてあるので、
-  本番サイトで撮影して貼り付けてください。貼る場所の一覧は `docs/screenshot-list.md`（全27箇所）です。
+- **スクリーンショットは貼り込み済みです（全27箇所）。** 画像は `docs/images/` にあり、
+  テスト環境（デモデータ）の画面です。本番の画面に差し替えたいときは、同じ名前で画像を置き換えて
+  作り直してください。どのページにどの画像が入っているかは `docs/screenshot-list.md` にあります。
 - Node.js が必要なのは**このマニュアル生成だけ**で、アプリ本体の動作・デプロイには不要です。
 - 原稿の書き方（見出し・手順・メモ・注意・スクショ枠の記法）は `bin/build_manuals.js` の冒頭に
   書いてあります。

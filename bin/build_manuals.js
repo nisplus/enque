@@ -107,9 +107,12 @@ function parseManual(markdown) {
             page.blocks.push({ type: 'section', text: line.slice(4).trim() });
             continue;
         }
+        // [[SCREENSHOT: 説明]] … 空の枠
+        // [[SCREENSHOT: 説明 | images/xxx.png]] … 画像を貼った状態で出力する
         const screenshot = line.match(/^\[\[SCREENSHOT:\s*(.+?)\]\]$/);
         if (screenshot) {
-            page.blocks.push({ type: 'screenshot', text: screenshot[1].trim() });
+            const [caption, image] = screenshot[1].split('|').map((s) => s.trim());
+            page.blocks.push({ type: 'screenshot', text: caption, image: image || null });
             continue;
         }
         if (line.startsWith('!! ')) {
@@ -160,6 +163,32 @@ function plain(text) {
     return text.replace(/\*\*/g, '').replace(/`/g, '');
 }
 
+/** PNGの大きさをヘッダーから読む（画像を貼るときの縦横比に使う） */
+function pngSize(file) {
+    const buf = Buffer.alloc(24);
+    const fd = fs.openSync(file, 'r');
+    fs.readSync(fd, buf, 0, 24, 0);
+    fs.closeSync(fd);
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+/** 貼り込む画像の表示サイズ（幅いっぱい、ただし高さは上限まで） */
+const IMAGE_MAX_H = 3.8;
+function imageBox(block) {
+    const file = path.join(ROOT, block.image);
+    if (!fs.existsSync(file)) {
+        return null;
+    }
+    const size = pngSize(file);
+    let w = CONTENT_W;
+    let h = (size.height / size.width) * w;
+    if (h > IMAGE_MAX_H) {
+        h = IMAGE_MAX_H;
+        w = (size.width / size.height) * h;
+    }
+    return { file, w, h, x: MARGIN + (CONTENT_W - w) / 2 };
+}
+
 function blockHeight(block) {
     switch (block.type) {
         case 'section':    return textHeight(plain(block.text), 14, CONTENT_W) + 0.20;
@@ -168,7 +197,15 @@ function blockHeight(block) {
         case 'para':       return textHeight(plain(block.text), 11, CONTENT_W) + 0.10;
         case 'note':
         case 'warn':       return textHeight(plain(block.text), 10.5, CONTENT_W - 0.55) + 0.34;
-        case 'screenshot': return 2.95;
+        case 'screenshot': {
+            if (block.image) {
+                const box = imageBox(block);
+                if (box) {
+                    return box.h + 0.42; // 画像＋説明文
+                }
+            }
+            return 2.95;
+        }
         default:           return 0.2;
     }
 }
@@ -233,6 +270,16 @@ function drawBlock(slide, block, y, theme) {
         }
 
         case 'screenshot': {
+            const box = block.image ? imageBox(block) : null;
+            if (box) {
+                slide.addImage({ path: box.file, x: box.x, y: y, w: box.w, h: box.h });
+                slide.addText(block.text, {
+                    x: MARGIN, y: y + box.h + 0.06, w: CONTENT_W, h: 0.3,
+                    align: 'center', fontSize: 9.5, color: MUTED, margin: 0, isTextBox: true, fontFace: 'Calibri',
+                });
+                break;
+            }
+
             const h = 2.85;
             slide.addShape('roundRect', {
                 x: MARGIN, y: y, w: CONTENT_W, h,
@@ -333,7 +380,7 @@ function buildDeck(sourceFile, themeKey) {
             lineSpacingMultiple: 1.3, fontFace: 'Calibri',
         });
     }
-    cover.addText('A4縦で印刷できます。スクリーンショットの枠は、実際の画面を撮って貼り替えてください。', {
+    cover.addText('A4縦で印刷できます。画面例はテスト環境のもので、実際の表示とは名称や件数が異なる場合があります。', {
         x: MARGIN, y: PAGE.h - 1.1, w: CONTENT_W, h: 0.5,
         fontSize: 9.5, color: 'FFFFFF', margin: 0, isTextBox: true, fontFace: 'Calibri',
     });
@@ -367,7 +414,12 @@ function collectShots(doc) {
             pageNumber++;
             for (const block of chunk.blocks) {
                 if (block.type === 'screenshot') {
-                    list.push({ page: pageNumber, heading: plain(chunk.heading), text: block.text });
+                    list.push({
+                        page: pageNumber,
+                        heading: plain(chunk.heading),
+                        text: block.text,
+                        image: block.image,
+                    });
                 }
             }
         }
@@ -377,12 +429,13 @@ function collectShots(doc) {
 
 function writeShotList(decks) {
     const lines = [
-        '# スクリーンショット貼り付け一覧',
+        '# マニュアルの画面写真',
         '',
-        'マニュアル（`docs/manual-*.pptx`）にある点線の枠に貼る画面の一覧です。',
-        '本番サイトで撮影して、枠の上に貼り付けてください（枠ごと削除して構いません）。',
+        'マニュアル（`docs/manual-*.pptx`）に入っている画面写真の一覧です。',
+        '**テスト環境（デモデータ）の画面**を貼ってあります。本番の画面に差し替えたい場合は、',
+        '`docs/images/` の画像を同じ名前で置き換えて `node bin/build_manuals.js` を実行してください。',
         '',
-        '撮影のコツ:',
+        '差し替えるときのコツ:',
         '',
         '- ブラウザの表示倍率は100%、不要なタブやブックマークバーは隠すと見やすくなります',
         '- スマートフォンの画面は、端末のスクリーンショット機能で撮ってください',
@@ -395,9 +448,9 @@ function writeShotList(decks) {
 
     for (const deck of decks) {
         lines.push(`## ${deck.title}（${deck.file}）`, '');
-        lines.push('| ページ | 見出し | 撮る画面 |', '|---|---|---|');
+        lines.push('| ページ | 見出し | 画面 | 画像ファイル |', '|---|---|---|---|');
         for (const shot of deck.shots) {
-            lines.push(`| ${shot.page} | ${shot.heading} | ${shot.text} |`);
+            lines.push(`| ${shot.page} | ${shot.heading} | ${shot.text} | ${shot.image ?? '（画像なし）'} |`);
         }
         lines.push('');
     }
