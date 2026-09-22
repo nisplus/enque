@@ -898,7 +898,18 @@ replace_questions($partySurveyId, array_merge(
 $partyQuestion = questions_for_survey($partySurveyId)[0];
 check('the number question is stored', (string) $partyQuestion['type'] === 'number');
 check('the question is marked as the party size', is_party_size_question($partyQuestion));
-check('the number range is kept', number_settings($partyQuestion)['max'] === 20);
+check('the party size maximum comes from the configuration',
+    number_settings($partyQuestion)['max'] === party_size_max(), 'max=' . number_settings($partyQuestion)['max']);
+
+// 人数はキーボードを出さずに選べるよう、回答画面では選択式で出す
+$partyPath = '/s/' . (string) find_event($insightEventId)['slug']
+    . '/' . (string) find_company($insightCompanies['I-A']['company_id'])['qr_slug'];
+$res = request('GET', $partyPath, null, 'party');
+check('the party size question renders as a dropdown',
+    str_contains($res['body'], '<select name="q[' . (int) $partyQuestion['id'] . ']">'), 'status=' . $res['status']);
+check('the dropdown ends with the configured maximum',
+    str_contains($res['body'], '>' . party_size_max() . '人以上</option>'));
+check('the dropdown starts at one person', str_contains($res['body'], '>1人</option>'));
 
 // v1 は I-A で「3人」と回答。v2・v3 は未回答
 $partyAnswer = db()->prepare(

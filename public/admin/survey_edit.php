@@ -238,8 +238,14 @@ $render = static function (?array $question, int $index, bool $isNew = false): v
     echo '<label class="choice"><input type="checkbox" name="q[' . $index . '][metric]" value="party_size"'
         . ($isParty ? ' checked' : '') . '>';
     echo '<span>この回答を<strong>来場人数</strong>として集計する'
-        . '<span class="hint">「何人で来られましたか」のような設問に付けます。'
-        . 'ダッシュボードの「のべ来場者」に足し上げられます（種類が「数値入力」のときだけ有効）。</span></span></label>';
+        . '<span class="hint">「何人で来られましたか」のような設問に付けます（種類が「数値入力」のときだけ有効）。'
+        . '回答画面では <strong>1〜' . party_size_max() . '人以上の選択式</strong>になり、'
+        . 'ダッシュボードの「のべ来場者」に足し上げられます。<br>'
+        . '<strong>2社目以降は、前の企業で答えた人数が初期値として入ります</strong>'
+        . '（同じスマホ・同じブラウザの場合）。実質的に入力は最初の1社だけで済むため、'
+        . '必須にしても来場者の手間はほとんど増えません。<br>'
+        . '未回答のぶんは「同じ来場者が別の企業で答えた人数 → それも無ければ全体の平均」の順に補って集計します。'
+        . '</span></span></label>';
 
     echo '</div>';
 };

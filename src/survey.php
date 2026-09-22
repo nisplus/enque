@@ -71,9 +71,19 @@ const NUMBER_DEFAULTS = ['min' => 1, 'max' => 99, 'unit' => '人'];
 function number_settings(array $question): array
 {
     $settings = NUMBER_DEFAULTS;
+
+    // 来場人数の設問は、上限を .env（PARTY_SIZE_MAX）で揃える
+    if (is_party_size_question($question)) {
+        $settings['max'] = party_size_max();
+    }
+
     $decoded  = json_decode((string) ($question['options'] ?? ''), true);
     if (is_array($decoded)) {
         foreach (['min', 'max'] as $key) {
+            // 来場人数の上限は .env に揃えるため、設問側の max は使わない
+            if ($key === 'max' && is_party_size_question($question)) {
+                continue;
+            }
             if (isset($decoded[$key]) && is_numeric($decoded[$key])) {
                 $settings[$key] = (int) $decoded[$key];
             }

@@ -15,6 +15,7 @@ if (PHP_SAPI !== 'cli') {
     exit("CLI only\n");
 }
 
+require_once dirname(__DIR__) . '/src/config.php';
 require_once dirname(__DIR__) . '/src/helpers.php';
 require_once dirname(__DIR__) . '/src/survey.php';
 require_once dirname(__DIR__) . '/src/csv.php';
@@ -138,6 +139,44 @@ check('rating rejects 0', validate_answer($rating, '0')['ok'] === false);
 check('rating rejects 6', validate_answer($rating, '6')['ok'] === false);
 check('rating rejects non-numeric input', validate_answer($rating, '3a')['ok'] === false);
 
+// 数値入力（来場人数など）。全角・範囲外・小数の扱いを固定しておく
+$number = [
+    'id' => 10, 'type' => 'number', 'label' => '何人で来られましたか',
+    'options' => json_encode(['min' => 1, 'max' => 10, 'unit' => '人']), 'required' => 0, 'metric' => 'none',
+];
+check('number accepts a half-width digit', validate_answer($number, '3')['value'] === '3');
+check('number accepts a full-width digit', validate_answer($number, '３')['value'] === '3');
+check('number trims surrounding spaces', validate_answer($number, ' 4 ')['value'] === '4');
+check('number drops leading zeros', validate_answer($number, '05')['value'] === '5');
+check('number rejects a value below the minimum', validate_answer($number, '0')['ok'] === false);
+check('number rejects a value above the maximum', validate_answer($number, '11')['ok'] === false);
+check('number rejects a decimal', validate_answer($number, '2.5')['ok'] === false);
+check('number rejects letters', validate_answer($number, 'あ')['ok'] === false);
+check('number rejects a negative value', validate_answer($number, '-1')['ok'] === false);
+check('an optional number may be left blank', validate_answer($number, '') === ['ok' => true, 'value' => null]);
+
+$requiredNumber = $number;
+$requiredNumber['required'] = 1;
+check('a required number must be answered', validate_answer($requiredNumber, '')['error'] === 'required');
+
+check('the number answer is shown with its unit', format_answer_value($number, '3') === '3人');
+check('the number settings come from the options',
+    number_settings($number) === ['min' => 1, 'max' => 10, 'unit' => '人']);
+check('the number settings fall back to the defaults',
+    number_settings(['type' => 'number', 'options' => null]) === NUMBER_DEFAULTS);
+check('settings text is parsed',
+    parse_number_settings_text("min=2\nmax=8\nunit=名") === ['min' => 2, 'max' => 8, 'unit' => '名']);
+check('a broken range is corrected', parse_number_settings_text("min=5\nmax=1")['max'] === 5);
+
+// 来場人数の設問は、上限を .env（PARTY_SIZE_MAX）に揃える
+$party = $number;
+$party['metric'] = 'party_size';
+check('the party size question follows the configured maximum',
+    number_settings($party)['max'] === party_size_max(), 'max=' . number_settings($party)['max']);
+check('a value above the configured maximum is rejected',
+    validate_answer($party, (string) (party_size_max() + 1))['ok'] === false);
+check('the configured maximum itself is accepted',
+    validate_answer($party, (string) party_size_max())['value'] === (string) party_size_max());
 $nps = ['id' => 6, 'type' => 'nps', 'label' => 'Q', 'options' => null, 'required' => 0];
 check('nps accepts 0', validate_answer($nps, '0')['value'] === '0');
 check('nps accepts 10', validate_answer($nps, '10')['value'] === '10');

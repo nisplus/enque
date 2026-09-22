@@ -160,15 +160,31 @@ function render_question(array $question, array $previous = [], bool $invalid = 
         case QuestionType::Number: {
             $settings = number_settings($question);
             $value    = is_string($old) ? trim($old) : '';
-            echo '<div class="number-field">';
-            echo '<input type="number" name="' . e($name) . '" value="' . e($value) . '" '
-                . 'min="' . $settings['min'] . '" max="' . $settings['max'] . '" step="1" '
-                . 'inputmode="numeric" pattern="[0-9]*">';
-            echo '<span class="number-unit">' . e($settings['unit']) . '</span>';
-            echo '</div>';
+
+            if (is_party_size_question($question)) {
+                // 人数は選択式にする。キーボードを出さずに選べて、全角入力の事故も起きない
+                echo '<div class="number-field">';
+                echo '<select name="' . e($name) . '">';
+                echo '<option value="">選んでください</option>';
+                for ($i = $settings['min']; $i <= $settings['max']; $i++) {
+                    $selected = $value !== '' && (int) $value === $i ? ' selected' : '';
+                    $text     = $i . $settings['unit'] . ($i === $settings['max'] ? '以上' : '');
+                    echo '<option value="' . $i . '"' . $selected . '>' . e($text) . '</option>';
+                }
+                echo '</select>';
+                echo '</div>';
+            } else {
+                echo '<div class="number-field">';
+                echo '<input type="number" name="' . e($name) . '" value="' . e($value) . '" '
+                    . 'min="' . $settings['min'] . '" max="' . $settings['max'] . '" step="1" '
+                    . 'inputmode="numeric" pattern="[0-9]*">';
+                echo '<span class="number-unit">' . e($settings['unit']) . '</span>';
+                echo '</div>';
+            }
+
             if ($value !== '') {
-                // 2社目以降は、前の企業で答えた人数をあらかじめ入れておく
-                echo '<p class="muted">前にご回答いただいた人数を入れてあります。違う場合は書き換えてください。</p>';
+                // 2社目以降は、前の企業で答えた人数をあらかじめ選んでおく
+                echo '<p class="muted">前にご回答いただいた人数を選んであります。違う場合は選び直してください。</p>';
             }
             break;
         }

@@ -154,12 +154,27 @@ sudo cp deploy/cron-enque /etc/cron.d/enque
 `.env` の `DISPLAY_ERRORS` は本番では必ず `0`、HTTPS運用なら `SESSION_SECURE=1` にします。
 **`BASE_URL` はQRコードとメールに埋め込まれるため、QRを印刷する前に必ず本番URLへ設定してください。**
 
-管理画面の見出し（既定は「周遊アンケート管理」）は `.env` の `ADMIN_TITLE` で変えられます。
-ヘッダーとブラウザのタブ名の両方に反映されます。
+### イベントに合わせて変えられる表記
+
+画面とメールに出る名前は、コードを触らずに `.env` で変えられます。
 
 ```ini
+# 管理画面のヘッダーとブラウザのタブ名（既定は「周遊アンケート管理」）
 ADMIN_TITLE=◯◯フェア2026 運営
+
+# イベント終了後に送るアンケートの呼び名（既定は「総合アンケート」）
+OVERALL_SURVEY_LABEL=総合アンケート
+
+# 特典の壁紙の呼び名（既定は「オリジナルのスマホ壁紙」）
+WALLPAPER_LABEL=◯◯フェアオリジナル壁紙
+
+# 来場人数（「何人で来られましたか」）の選択肢の上限（既定は10）
+PARTY_SIZE_MAX=10
 ```
+
+`PARTY_SIZE_MAX` は、人数を選ぶプルダウンの上限です。`10` なら「1人」〜「9人」と
+「10人以上」が並び、**「10人以上」は10人として集計します**（多めには見積もりません）。
+2以上の数を指定してください。
 
 ## 更新（デプロイ）とデータベースのマイグレーション
 
@@ -378,9 +393,9 @@ C:\xampp\php\php.exe bin\seed_traffic.php --force --visitors=200
 ## テスト
 
 ```
-C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（53項目）
+C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（72項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（233項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（236項目）
 node tests\scan_test.js                                   REM QR読み取り判定（17項目・Nodeがある場合のみ）
 ```
 

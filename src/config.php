@@ -121,6 +121,8 @@ function config(): array
         'overall_label'        => (string) env('OVERALL_SURVEY_LABEL', '総合アンケート'),
         // 特典の壁紙の呼び名（イベントごとのブランド名を入れられる）
         'wallpaper_label'      => (string) env('WALLPAPER_LABEL', 'オリジナルのスマホ壁紙'),
+        // 来場人数の選択肢の上限。これ以上は「◯人以上」としてまとめ、集計では上限の値で数える
+        'party_size_max'       => max(2, (int) env('PARTY_SIZE_MAX', '10')),
         // QR・メールに埋め込む公開URL（未設定ならリクエストから推定する）
         'base_url'             => rtrim((string) env('BASE_URL', ''), '/'),
         'pretty_urls'          => env_bool('PRETTY_URLS', true),
@@ -173,6 +175,17 @@ function overall_label(): string
 function wallpaper_label(): string
 {
     return config()['wallpaper_label'];
+}
+
+/**
+ * 来場人数の選択肢の上限（.env の PARTY_SIZE_MAX、既定10）。
+ *
+ * 選択肢は 1人〜(上限-1)人 と「上限人以上」になる。
+ * 「10人以上」は10人として集計する（等倍。多めに見積もらない）。
+ */
+function party_size_max(): int
+{
+    return config()['party_size_max'];
 }
 
 /**

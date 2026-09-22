@@ -330,6 +330,11 @@ details.answers-detail summary { cursor: pointer; color: var(--accent); }
 }
 
 /* 数値入力（来場人数など） ---------------------------------------------------- */
-.number-field { display: flex; align-items: center; gap: 10px; max-width: 220px; }
-.number-field input { font-size: 1.3rem; text-align: center; padding: 12px; }
-.number-unit { font-size: 1.05rem; color: var(--text-secondary); white-space: nowrap; }
+/* 入力欄と単位は必ず同じ行に並べる（単位だけ折り返さないように） */
+.number-field { display: flex; align-items: center; gap: 10px; max-width: 260px; flex-wrap: nowrap; }
+.number-field input, .number-field select {
+  flex: 1 1 auto; min-width: 0; width: auto;
+  font-size: 1.15rem; padding: 12px;
+}
+.number-field input { text-align: center; }
+.number-unit { flex: 0 0 auto; font-size: 1.05rem; color: var(--text-secondary); white-space: nowrap; }
