@@ -6,7 +6,7 @@ require_once __DIR__ . '/view.php';
 /**
  * アンケート回答フォームの描画。
  *
- * 企業アンケート（s.php）・全体アンケート（o.php）・入力エラーでの再表示
+ * 企業アンケート（s.php）・総合アンケート（o.php）・入力エラーでの再表示
  * （submit.php）の3か所から呼ぶ。エラー時は入力済みの内容をそのまま埋め戻すので、
  * JavaScriptが無効な端末でも入力し直しにならない。
  *
@@ -73,8 +73,8 @@ function render_survey_page(array $view): void
     if ($view['ask_email']) {
         echo '<div class="card">';
         echo '<label class="field" for="email">メールアドレス（任意）';
-        echo '<span class="hint">イベント終了後に「総合アンケート」のご案内をお送りします。';
-        echo 'ご回答いただくと、はいてくヒルズオリジナル壁紙をダウンロードできます。';
+        echo '<span class="hint">イベント終了後に「' . e(overall_label()) . '」のご案内をお送りします。';
+        echo 'ご回答いただくと、' . e(wallpaper_label()) . 'をダウンロードできます。';
         echo '入力は任意で、他の個人情報はお伺いしません。</span></label>';
         echo '<input type="email" id="email" name="email" autocomplete="email" inputmode="email" '
             . 'value="' . e($view['email_value']) . '" placeholder="example@example.jp">';

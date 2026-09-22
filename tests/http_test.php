@@ -1007,6 +1007,25 @@ check('the browser title uses the same name', str_contains($res['body'], '<title
 $res = request('GET', '/admin/login.php', null, 'nocookie');
 check('the login page shows the configured title too', str_contains($res['body'], admin_title()));
 
+echo "=== labels ===\n";
+
+// 画面とメールの呼び名は .env（OVERALL_SURVEY_LABEL / WALLPAPER_LABEL）から来る
+check('the survey label has a value', overall_label() !== '');
+check('the wallpaper label has a value', wallpaper_label() !== '');
+
+$mail = build_invite_mail($event, 'preview-' . $eventId);
+check('the mail subject uses the survey label', str_contains($mail['subject'], overall_label()));
+check('the mail subject uses the wallpaper label', str_contains($mail['subject'], wallpaper_label()));
+check('the mail body uses both labels',
+    str_contains($mail['body'], overall_label()) && str_contains($mail['body'], wallpaper_label()));
+
+$res = done_page();
+check('the done page uses the survey label', str_contains($res['body'], overall_label()));
+
+$res = request('GET', '/admin/invites.php?event=' . $eventId, null, 'org');
+check('the admin page uses the survey label', str_contains($res['body'], overall_label()));
+check('the old wording is gone from the admin page', !str_contains($res['body'], '全体アンケート'));
+
 echo "=== reset script ===\n";
 
 // 初期化スクリプトは --event で範囲を限定できる。他のデータに触れないことを、

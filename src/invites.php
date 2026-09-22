@@ -5,7 +5,7 @@ require_once __DIR__ . '/repository.php';
 require_once __DIR__ . '/mailer.php';
 
 /**
- * 全体アンケートの案内メール送信。
+ * 総合アンケートの案内メール送信。
  *
  * 管理画面（少量の送信）と cron（一括送信）の両方から呼ぶ。
  */
@@ -17,18 +17,21 @@ require_once __DIR__ . '/mailer.php';
  */
 function build_invite_mail(array $event, string $token): array
 {
-    $url  = overall_url($token);
-    $name = (string) $event['name'];
+    $url       = overall_url($token);
+    $name      = (string) $event['name'];
+    // アンケートと壁紙の呼び名は .env（OVERALL_SURVEY_LABEL / WALLPAPER_LABEL）で決める
+    $survey    = overall_label();
+    $wallpaper = wallpaper_label();
 
-    $subject = '【' . $name . '】アンケートのお願い（スマホ壁紙プレゼント）';
+    $subject = '【' . $name . '】' . $survey . 'のお願い（' . $wallpaper . 'プレゼント）';
 
     $body = <<<TEXT
     このたびは「{$name}」にご来場いただき、ありがとうございました。
 
     会場のブースでアンケートにご回答いただいた皆さまに、
-    イベント全体についてのアンケートをお願いしております。
+    イベント全体についてお伺いする{$survey}をお願いしております。
 
-    ご回答いただくと、その場ではいてくヒルズオリジナル壁紙をダウンロードいただけます。
+    ご回答いただくと、その場で{$wallpaper}をダウンロードいただけます。
 
     ▼ 回答はこちら（所要3分ほど）
     {$url}
@@ -62,7 +65,7 @@ function send_pending_invites(int $eventId, int $limit = 100, ?callable $log = n
 
     $survey = overall_survey($eventId);
     if ($survey === null || (int) $survey['is_published'] !== 1) {
-        throw new RuntimeException('全体アンケートが公開されていません。先に公開してください。');
+        throw new RuntimeException('総合アンケートが公開されていません。先に公開してください。');
     }
 
     $throttleUs = max(0, config()['mail']['throttle_ms']) * 1000;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  * 壁紙ダウンロード画面。
  *
- * 全体アンケートに回答した来場者だけがアクセスできる（トークンで判定する）。
+ * 総合アンケートに回答した来場者だけがアクセスできる（トークンで判定する）。
  */
 
 require_once dirname(__DIR__) . '/src/bootstrap.php';
@@ -16,7 +16,7 @@ if ($invite === null) {
     abort(404, 'このURLは無効です。メールに記載されたリンクをもう一度お試しください。');
 }
 
-// 全体アンケートに回答していなければ、まず回答画面へ
+// 総合アンケートに回答していなければ、まず回答画面へ
 if (($invite['responded_at'] ?? null) === null) {
     redirect('/o.php?t=' . rawurlencode($token));
 }
@@ -36,7 +36,7 @@ $isMobile = $isIos || preg_match('/Android|Mobile/i', $ua) === 1;
 page_header('スマホ壁紙のダウンロード｜' . (string) $event['name'], ['brand' => (string) $event['name']]);
 
 echo '<h1>ご回答ありがとうございました</h1>';
-echo '<p>はいてくヒルズオリジナルスマホ壁紙をダウンロードいただけます。</p>';
+echo '<p>' . e(wallpaper_label()) . 'をダウンロードいただけます。</p>';
 
 if ($wallpapers === []) {
     echo '<div class="alert alert-info">壁紙は現在準備中です。お手数ですが、しばらくしてからもう一度アクセスしてください。</div>';

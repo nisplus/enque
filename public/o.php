@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * 全体アンケートの回答画面（イベント終了後にメールで案内するURL）。
+ * 総合アンケートの回答画面（イベント終了後にメールで案内するURL）。
  *
  *   /o/<トークン>      （mod_rewrite 経由）
  *   /o.php?t=<トークン>
@@ -21,7 +21,7 @@ if ($preview) {
     $admin = current_admin();
     if ($admin === null || (string) $admin['role'] !== 'organizer') {
         http_response_code(403);
-        page_header('プレビュー｜全体アンケート');
+        page_header('プレビュー｜総合アンケート');
         echo '<h1>プレビューの表示にはログインが必要です</h1>';
         echo '<div class="alert alert-info">このリンクは、管理画面の「テスト送信」で送られるスタッフ確認用のプレビューです。';
         echo '主催者としてログインした状態で開いてください。</div>';
@@ -57,13 +57,13 @@ $survey    = overall_survey((int) $event['id']);
 $questions = $survey === null ? [] : questions_for_survey((int) $survey['id']);
 
 if ($survey === null || $questions === [] || ((int) $survey['is_published'] !== 1 && !$preview)) {
-    page_header('全体アンケート｜' . (string) $event['name'], ['brand' => (string) $event['name']]);
-    echo '<h1>全体アンケート</h1>';
+    page_header('総合アンケート｜' . (string) $event['name'], ['brand' => (string) $event['name']]);
+    echo '<h1>総合アンケート</h1>';
     if ($preview) {
-        echo '<div class="alert alert-warn">全体アンケートに設問がまだありません。';
-        echo '<a href="/admin/invites.php">全体アンケートの編集</a>から設問を登録してください。</div>';
+        echo '<div class="alert alert-warn">総合アンケートに設問がまだありません。';
+        echo '<a href="/admin/invites.php">総合アンケートの編集</a>から設問を登録してください。</div>';
     } else {
-        echo '<div class="alert alert-info">全体アンケートは現在公開されていません。しばらくしてからお試しください。</div>';
+        echo '<div class="alert alert-info">総合アンケートは現在公開されていません。しばらくしてからお試しください。</div>';
     }
     page_footer();
     exit;
@@ -83,5 +83,5 @@ render_survey_page([
     'preview'     => $preview,
     'footer_note' => $preview
         ? 'これはスタッフ確認用のプレビューです。来場者には、その方専用のURLが記載されたメールが届きます。'
-        : 'ご回答後、はいてくヒルズオリジナル壁紙をダウンロードいただけます。',
+        : 'ご回答後、' . wallpaper_label() . 'をダウンロードいただけます。',
 ]);

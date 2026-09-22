@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * アンケート回答の受け付け（企業アンケート・全体アンケート共通）。
+ * アンケート回答の受け付け（企業アンケート・総合アンケート共通）。
  *
  * fetch から呼ばれた場合はJSONを返し、通常のフォーム送信（JS無効）の場合は
  * 画面を描き直す／完了画面へリダイレクトする。
@@ -93,7 +93,7 @@ if ($type === 'company') {
     }
     $visitor = current_visitor((int) $event['id']);
 } elseif ($type === 'overall') {
-    // 全体アンケートはメールで配ったトークンでのみ回答できる
+    // 総合アンケートはメールで配ったトークンでのみ回答できる
     $token  = post_string('t') ?? '';
     $invite = $token === '' ? null : find_invite_by_token($token);
     if ($invite === null || (int) $invite['event_id'] !== (int) $event['id']) {

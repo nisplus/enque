@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * 全体アンケートの案内メールを一括送信する（cron から実行する想定）。
+ * 総合アンケートの案内メールを一括送信する（cron から実行する想定）。
  *
  *   php bin/send_overall_invites.php --event=1 [--limit=200] [--prepare] [--dry-run]
  *

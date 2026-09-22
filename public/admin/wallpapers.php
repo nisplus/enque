@@ -121,7 +121,7 @@ render_alert(flash_take());
 
 echo '<h1>スマホ壁紙の登録</h1>';
 echo '<p class="muted">' . e((string) $event['name']) . '</p>';
-echo '<div class="alert alert-info">壁紙は「全体アンケート」に回答した来場者だけがダウンロードできます。';
+echo '<div class="alert alert-info">壁紙は「総合アンケート」に回答した来場者だけがダウンロードできます。';
 echo '端末に合わせて選べるよう、縦長（例：1080×2340）を1〜2種類登録しておくことをおすすめします。</div>';
 
 echo '<div class="card"><h2 style="margin-top:0">壁紙を追加する</h2>';

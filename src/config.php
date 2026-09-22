@@ -117,6 +117,10 @@ function config(): array
         ],
         // 管理画面のヘッダーとタイトルに出す名前（イベントや主催者に合わせて変えられる）
         'admin_title'          => (string) env('ADMIN_TITLE', '周遊アンケート管理'),
+        // イベント終了後に送るアンケートの呼び名（画面・メールの文面に使う）
+        'overall_label'        => (string) env('OVERALL_SURVEY_LABEL', '総合アンケート'),
+        // 特典の壁紙の呼び名（イベントごとのブランド名を入れられる）
+        'wallpaper_label'      => (string) env('WALLPAPER_LABEL', 'オリジナルのスマホ壁紙'),
         // QR・メールに埋め込む公開URL（未設定ならリクエストから推定する）
         'base_url'             => rtrim((string) env('BASE_URL', ''), '/'),
         'pretty_urls'          => env_bool('PRETTY_URLS', true),
@@ -152,6 +156,23 @@ function config(): array
 function admin_title(): string
 {
     return config()['admin_title'];
+}
+
+/**
+ * イベント終了後に送るアンケートの呼び名（.env の OVERALL_SURVEY_LABEL）。
+ *
+ * 画面とメールの文面はこの関数を通す。イベントごとに呼び方が変わっても、
+ * コードを直さずに .env だけで揃えられるようにするため。
+ */
+function overall_label(): string
+{
+    return config()['overall_label'];
+}
+
+/** 特典の壁紙の呼び名（.env の WALLPAPER_LABEL。例：〇〇オリジナル壁紙） */
+function wallpaper_label(): string
+{
+    return config()['wallpaper_label'];
 }
 
 /**

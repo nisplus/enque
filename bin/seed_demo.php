@@ -6,7 +6,7 @@ declare(strict_types=1);
  *
  *   php bin/seed_demo.php [--force]
  *
- * イベント1件・企業3社・共通設問テンプレート・全体アンケートを登録する。
+ * イベント1件・企業3社・共通設問テンプレート・総合アンケートを登録する。
  * 既存データは消さないが、開発用DBでのみ実行すること。
  */
 
@@ -66,14 +66,14 @@ foreach ($companyNames as $i => $name) {
     echo "企業を作成しました：{$name}\n  {$url}\n";
 }
 
-// 全体アンケート
-$overallId = create_survey($eventId, null, 'overall', 'デモ合同説明会 2026 全体アンケート', 'イベント全体についてお聞かせください。', true);
+// 総合アンケート
+$overallId = create_survey($eventId, null, 'overall', 'デモ合同説明会 2026 総合アンケート', 'イベント全体についてお聞かせください。', true);
 replace_questions($overallId, [
     ['id' => null, 'type' => 'rating', 'label' => 'イベント全体の満足度を教えてください', 'options' => [], 'required' => true],
     ['id' => null, 'type' => 'multi', 'label' => '来場のきっかけを教えてください（複数選択可）', 'options' => ['Webサイト', 'SNS', '知人の紹介', 'DM・チラシ'], 'required' => false],
     ['id' => null, 'type' => 'text', 'label' => '次回に向けてのご意見をお聞かせください', 'options' => [], 'required' => false],
 ]);
-echo "全体アンケートを作成しました。\n";
+echo "総合アンケートを作成しました。\n";
 
 // 景品（総合受付が交換時に選ぶ）
 create_prize($eventId, 'オリジナルトートバッグ', 100, '先着100名');

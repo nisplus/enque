@@ -165,7 +165,7 @@ render_stat('回答率', $rates['response_rate'] . '%',
     'アンケートを開いた ' . $rates['opened'] . '人中 ' . $rates['responded'] . '人が送信');
 render_stat('重複送信の割合', $rates['duplicate_rate'] . '%', '同じ企業への送り直し');
 render_stat('メール登録率', $rates['email_rate'] . '%', '回答者のうち');
-render_stat('全体アンケート回答率', $rates['overall_rate'] . '%', '案内メールを送った人のうち');
+render_stat('総合アンケート回答率', $rates['overall_rate'] . '%', '案内メールを送った人のうち');
 render_stat('景品交換率', $rates['claim_rate'] . '%', 'コード発行のうち');
 echo '</div>';
 

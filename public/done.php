@@ -134,8 +134,8 @@ if ($error !== null) {
 if (($visitor['email'] ?? null) === null) {
     echo '<div class="card">';
     echo '<h2 style="margin-top:0">スマホ壁紙をご希望の方へ</h2>';
-    echo '<p>イベント終了後に「総合アンケート」のご案内をお送りします。ご回答いただくと、';
-    echo 'はいてくヒルズオリジナル壁紙をダウンロードできます。</p>';
+    echo '<p>イベント終了後に「' . e(overall_label()) . '」のご案内をお送りします。ご回答いただくと、';
+    echo e(wallpaper_label()) . 'をダウンロードできます。</p>';
     echo '<form method="post">';
     // コード付きで開いている場合も、送信先を同じ来場者に保つ
     echo '<input type="hidden" name="c" value="' . e($code) . '">';
@@ -146,7 +146,7 @@ if (($visitor['email'] ?? null) === null) {
     echo '</form>';
     echo '</div>';
 } else {
-    echo '<div class="alert alert-info">イベント終了後、ご登録のメールアドレス宛に総合アンケートのご案内をお送りします。</div>';
+    echo '<div class="alert alert-info">イベント終了後、ご登録のメールアドレス宛に' . e(overall_label()) . 'のご案内をお送りします。</div>';
 }
 
 // スタッフがログインしていない状態でQRを読み取った場合の逃げ道

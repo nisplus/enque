@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * 全体アンケートと案内メールの管理（主催者）。
+ * 総合アンケートと案内メールの管理（主催者）。
  *
  * 大量送信は cron（bin/send_overall_invites.php）で行う前提で、この画面からは
  * 準備・テスト送信・少量の送信・状況確認・メールアドレスの削除を行う。
@@ -29,11 +29,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
     if ($action === 'create_overall') {
         if (overall_survey($eventId) === null) {
-            $id = create_survey($eventId, null, 'overall', (string) $event['name'] . ' 全体アンケート', null, false);
-            flash_set('success', '全体アンケートを作成しました。設問を登録してください。');
+            $id = create_survey($eventId, null, 'overall', (string) $event['name'] . ' 総合アンケート', null, false);
+            flash_set('success', '総合アンケートを作成しました。設問を登録してください。');
             redirect('survey_edit.php?survey=' . $id);
         }
-        flash_set('error', '全体アンケートはすでに作成されています。');
+        flash_set('error', '総合アンケートはすでに作成されています。');
     } elseif ($action === 'create_template') {
         if (template_survey($eventId) === null) {
             $id = create_survey($eventId, null, 'template', '共通設問テンプレート', null, false);
@@ -88,10 +88,10 @@ $template = template_survey($eventId);
 $stats    = invite_stats($eventId);
 $summary  = event_summary($eventId);
 
-admin_page_header($user, '全体アンケート', 'invites.php');
+admin_page_header($user, '総合アンケート', 'invites.php');
 render_alert(flash_take());
 
-echo '<h1>全体アンケートと案内メール</h1>';
+echo '<h1>総合アンケートと案内メール</h1>';
 echo '<p class="muted">' . e((string) $event['name']) . '（' . e(event_status_label((string) $event['status'])) . '）</p>';
 
 if (mail_is_configured()) {
@@ -103,14 +103,14 @@ if (mail_is_configured()) {
     echo '外部SMTPに直接接続する場合は <code class="mono">MAIL_TRANSPORT=smtp</code> と接続情報を設定してください。</div>';
 }
 
-// ---- 1. 全体アンケート
-echo '<div class="card"><h2 style="margin-top:0">1. 全体アンケートを用意する</h2>';
+// ---- 1. 総合アンケート
+echo '<div class="card"><h2 style="margin-top:0">1. 総合アンケートを用意する</h2>';
 if ($overall === null) {
     echo '<p>まだ作成されていません。</p>';
     echo '<form method="post">' . csrf_field();
     echo '<input type="hidden" name="action" value="create_overall">';
     echo '<input type="hidden" name="event_id" value="' . $eventId . '">';
-    echo '<div class="btn-row"><button type="submit" class="btn btn-primary">全体アンケートを作成する</button></div>';
+    echo '<div class="btn-row"><button type="submit" class="btn btn-primary">総合アンケートを作成する</button></div>';
     echo '</form>';
 } else {
     echo '<p>' . e((string) $overall['title']) . ' <span class="badge badge-'

@@ -173,7 +173,7 @@ render_stat('ユニーク来場者', count_label($summary['visitors'], '人'), '
 render_stat('回答した来場者', count_label($summary['responding_visitors'], '人'));
 render_stat('総回答数', count_label($summary['responses']), '重複' . $summary['duplicates'] . '件を除く');
 render_stat('平均訪問企業数', (string) $summary['avg_companies'] . '社', '1人あたり');
-render_stat('メール登録', count_label($summary['emails'], '人'), '全体アンケートの案内先');
+render_stat('メール登録', count_label($summary['emails'], '人'), '総合アンケートの案内先');
 render_stat('交換コード', count_label($summary['claims']), '交換済み ' . $summary['claimed'] . '件');
 echo '</div>';
 
@@ -217,9 +217,9 @@ echo '<a class="btn" href="companies.php?event=' . $eventId . '">企業・QRコ�
 echo '<a class="btn" href="export_csv.php?event=' . $eventId . '">全企業分のCSV</a>';
 echo '</div></div>';
 
-echo '<h2>全体アンケート・壁紙</h2>';
+echo '<h2>総合アンケート・壁紙</h2>';
 echo '<div class="card">';
-echo '<p>全体アンケート：';
+echo '<p>総合アンケート：';
 if ($overall === null) {
     echo '<span class="badge badge-optional">未作成</span>';
 } else {
@@ -233,7 +233,7 @@ echo '<p>案内メール：送信済み ' . $invites['sent'] . '件／未送信 
     . '件／失敗 ' . $invites['failed'] . '件／回答 ' . $invites['responded'] . '件</p>';
 echo '<p>共通設問テンプレート：' . ($template === null ? '未作成' : e((string) $template['title'])) . '</p>';
 echo '<div class="btn-row">';
-echo '<a class="btn" href="invites.php?event=' . $eventId . '">全体アンケートと案内メール</a>';
+echo '<a class="btn" href="invites.php?event=' . $eventId . '">総合アンケートと案内メール</a>';
 echo '<a class="btn" href="wallpapers.php?event=' . $eventId . '">壁紙の登録</a>';
 echo '</div></div>';
 
@@ -248,7 +248,7 @@ echo '<input type="date" id="ev-start" name="start_date" value="' . e((string) (
 echo '<label class="field" for="ev-end">開催日（終了）</label>';
 echo '<input type="date" id="ev-end" name="end_date" value="' . e((string) ($event['end_date'] ?? '')) . '">';
 echo '<label class="field" for="ev-status">状態<span class="hint">';
-echo '「開催中」の間だけブースのアンケートに回答できます。終了にすると回答を締め切り、全体アンケートの案内を送れます。';
+echo '「開催中」の間だけブースのアンケートに回答できます。終了にすると回答を締め切り、総合アンケートの案内を送れます。';
 echo '</span></label>';
 echo '<select id="ev-status" name="status">';
 foreach (['draft', 'open', 'closed'] as $status) {

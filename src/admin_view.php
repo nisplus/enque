@@ -25,7 +25,7 @@ function event_status_label(string $status): string
     return match ($status) {
         'draft'  => '準備中',
         'open'   => '開催中（回答受付）',
-        'closed' => '終了（全体アンケート送付）',
+        'closed' => '終了（総合アンケート送付）',
         default  => $status,
     };
 }
@@ -44,7 +44,7 @@ function admin_page_header(array $user, string $title, string $current = ''): vo
             ['href' => 'companies.php',  'label' => '企業・QR'],
             ['href' => 'insights.php',   'label' => '回答者傾向'],
             ['href' => 'wallpapers.php', 'label' => '壁紙'],
-            ['href' => 'invites.php',    'label' => '全体アンケート'],
+            ['href' => 'invites.php',    'label' => '総合アンケート'],
             ['href' => 'prizes.php',     'label' => '景品'],
             ['href' => 'claim.php',      'label' => '景品照会'],
             ['href' => 'users.php',      'label' => 'ユーザー'],

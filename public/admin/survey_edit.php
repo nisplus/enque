@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  * アンケート（設問）の編集。
  *
- * 企業アンケート・全体アンケート・共通設問テンプレートのいずれも、この画面で編集する。
+ * 企業アンケート・総合アンケート・共通設問テンプレートのいずれも、この画面で編集する。
  * JavaScriptに依存せず、設問の追加・削除・並べ替えはすべてサーバー側で処理する。
  */
 
@@ -22,7 +22,7 @@ $company = $survey['company_id'] === null ? null : find_company((int) $survey['c
 if ($company !== null) {
     assert_company_access($user, (int) $company['id']);
 } elseif ((string) $user['role'] !== 'organizer') {
-    // 全体アンケート・テンプレートは主催者のみ
+    // 総合アンケート・テンプレートは主催者のみ
     abort(404, 'ページが見つかりません。');
 }
 
@@ -136,7 +136,7 @@ $template  = template_survey((int) $survey['event_id']);
 
 $typeLabel = (string) $survey['type'];
 $heading   = match ($typeLabel) {
-    'overall'  => '全体アンケート',
+    'overall'  => '総合アンケート',
     'template' => '共通設問テンプレート',
     default    => (string) ($company['name'] ?? '') . ' のアンケート',
 };

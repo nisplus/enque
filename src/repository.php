@@ -153,7 +153,7 @@ function survey_for_company(int $companyId): ?array
     return $row === false ? null : $row;
 }
 
-/** イベントの全体アンケート（type=overall）。無ければ null */
+/** イベントの総合アンケート（type=overall）。無ければ null */
 function overall_survey(int $eventId): ?array
 {
     $stmt = db()->prepare("SELECT * FROM surveys WHERE event_id = ? AND type = 'overall' LIMIT 1");
@@ -886,7 +886,7 @@ function claims_without_prize(int $eventId): int
     return (int) $stmt->fetchColumn();
 }
 
-// ================================================================ 全体アンケート案内
+// ================================================================ 総合アンケート案内
 
 /**
  * メールアドレスを登録済みで、まだ案内行の無い来場者に案内行を作る。

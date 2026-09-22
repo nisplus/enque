@@ -383,7 +383,7 @@ function participation_rates(int $eventId): array
         'response_rate'  => percentage($summary['responding_visitors'], $summary['visitors']),
         'duplicate_rate' => percentage((int) $row['dup'], (int) $row['total']),
         'email_rate'     => percentage($summary['emails'], $summary['responding_visitors']),
-        // 案内メールを送った人のうち、全体アンケートに答えた割合
+        // 案内メールを送った人のうち、総合アンケートに答えた割合
         'overall_rate'   => percentage($invites['responded'], $invites['sent']),
         'claim_rate'     => percentage($summary['claimed'], $summary['claims']),
     ];

@@ -176,7 +176,7 @@ function survey_url(string $eventSlug, string $companySlug): string
     return base_url() . '/s.php?e=' . rawurlencode($eventSlug) . '&c=' . rawurlencode($companySlug);
 }
 
-/** 全体アンケートの公開URL（来場者ごとのトークン付き） */
+/** 総合アンケートの公開URL（来場者ごとのトークン付き） */
 function overall_url(string $token): string
 {
     if (config()['pretty_urls']) {
