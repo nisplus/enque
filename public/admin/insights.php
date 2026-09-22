@@ -89,8 +89,7 @@ if ($party['configured']) {
         echo '</div>';
         echo svg_bar_chart($party['distribution'], $party['answered']);
         echo '<p class="muted">人数は任意回答のため、未回答のぶんは';
-        echo '<strong>同じ来場者が別の企業で答えた人数</strong>、それも無ければ';
-        echo '<strong>回答があったぶんの平均（' . $party['average'] . '人）</strong>を当てはめて計算しています。';
+        echo '<strong>同じ来場者が別の企業で答えた人数</strong>などから補って計算しています。';
         echo '選択肢の上限「' . party_size_max() . '人以上」は、' . party_size_max() . '人として数えています'
             . '（多めには見積もりません）。</p>';
     }

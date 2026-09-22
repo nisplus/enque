@@ -911,6 +911,15 @@ check('the dropdown ends with the configured maximum',
     str_contains($res['body'], '>' . party_size_max() . '人以上</option>'));
 check('the dropdown starts at one person', str_contains($res['body'], '>1人</option>'));
 
+// 設問編集では、来場人数の指定は数値入力の設問にだけ出す（他の種類では隠す）
+$res = request('GET', '/admin/survey_edit.php?survey=' . $partySurveyId, null, 'org');
+preg_match_all('#<div class="metric-field"( hidden)?>#', $res['body'], $metricBoxes);
+$shownMetric = count(array_filter($metricBoxes[1], static fn(string $x): bool => $x === ''));
+check('the party size checkbox is shown on the number question',
+    $shownMetric === 1, 'shown=' . $shownMetric . ' status=' . $res['status']);
+check('the other questions keep the party size checkbox hidden',
+    count($metricBoxes[1]) > $shownMetric, 'total=' . count($metricBoxes[1]));
+
 // v1 は I-A で「3人」と回答。v2・v3 は未回答
 $partyAnswer = db()->prepare(
     'INSERT INTO answers (response_id, question_id, value)
@@ -1004,6 +1013,9 @@ check('the insights page shows the visit order', str_contains($res['body'], '企
 check('the insights page shows the transitions', str_contains($res['body'], 'よくある動線'));
 check('the insights page explains what lap time means', str_contains($res['body'], '滞在時間ではありません')
     || str_contains($res['body'], '含みません'));
+// 未回答を平均で補っていることは画面に出さない（主催者以外の目に触れさせない方針）
+check('the page does not spell out the averaging', !str_contains($res['body'], '全体の平均')
+    && !str_contains($res['body'], 'ぶんの平均'));
 
 $res = request('GET', '/admin/insights.php?event=' . $insightEventId, null, 'co');
 check('a company user cannot open the insights page', $res['status'] === 404, 'status=' . $res['status']);

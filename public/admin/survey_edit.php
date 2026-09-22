@@ -233,19 +233,19 @@ $render = static function (?array $question, int $index, bool $isNew = false): v
     echo '<label class="field">並び順<input type="number" name="q[' . $index . '][sort]" value="' . ($index + 1) . '"></label>';
     echo '</div>';
 
-    // 来場人数として集計する設問の指定（数値入力のときだけ効く）
+    // 来場人数として集計する設問の指定。数値入力のときだけ出す（種類を変えると下のJSで出し入れする）
     $isParty = $question !== null && is_party_size_question($question);
+    echo '<div class="metric-field"' . ($type === 'number' ? '' : ' hidden') . '>';
     echo '<label class="choice"><input type="checkbox" name="q[' . $index . '][metric]" value="party_size"'
         . ($isParty ? ' checked' : '') . '>';
     echo '<span>この回答を<strong>来場人数</strong>として集計する'
-        . '<span class="hint">「何人で来られましたか」のような設問に付けます（種類が「数値入力」のときだけ有効）。'
-        . '回答画面では <strong>1〜' . party_size_max() . '人以上の選択式</strong>になり、'
-        . 'ダッシュボードの「のべ来場者」に足し上げられます。<br>'
-        . '<strong>2社目以降は、前の企業で答えた人数が初期値として入ります</strong>'
-        . '（同じスマホ・同じブラウザの場合）。実質的に入力は最初の1社だけで済むため、'
-        . '必須にしても来場者の手間はほとんど増えません。<br>'
-        . '未回答のぶんは「同じ来場者が別の企業で答えた人数 → それも無ければ全体の平均」の順に補って集計します。'
+        . '<span class="hint">「何人で来られましたか」のような設問に付けます。'
+        . '回答画面は <strong>1〜' . party_size_max() . '人以上の選択式</strong>になり、'
+        . 'ダッシュボードの「のべ来場者」に足し上げられます。'
+        . '<strong>2社目以降は前の企業で答えた人数が初期値として入る</strong>ため'
+        . '（同じスマホ・同じブラウザの場合）、必須にしても来場者の手間はほとんど増えません。'
         . '</span></span></label>';
+    echo '</div>';
 
     echo '</div>';
 };
@@ -267,6 +267,16 @@ echo '</div>';
 echo '<p class="muted">設問文が空のまま保存すると、その行は登録されません。';
 echo '既存の設問を削除すると、その設問への回答も一緒に削除されます。</p>';
 echo '</form>';
+
+// 種類を「数値入力」にしたときだけ、来場人数のチェックボックスを出す
+echo '<script>document.querySelectorAll(".q-editor").forEach(function (box) {'
+    . 'var type = box.querySelector("select"), metric = box.querySelector(".metric-field");'
+    . 'if (!type || !metric) { return; }'
+    . 'type.addEventListener("change", function () {'
+    . 'metric.hidden = type.value !== "number";'
+    . 'if (metric.hidden) { metric.querySelector("input").checked = false; }'
+    . '});'
+    . '});</script>';
 
 if ($template !== null && (int) $template['id'] !== $surveyId) {
     echo '<div class="card"><h2 style="margin-top:0">共通設問を取り込む</h2>';
