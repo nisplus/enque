@@ -171,6 +171,7 @@ echo '<h2>' . e((string) $event['name']) . '<span class="badge badge-'
 echo '<div class="stat-grid">';
 render_stat('ユニーク来場者', count_label($summary['visitors'], '人'), 'アンケートを開いた端末数');
 render_stat('回答した来場者', count_label($summary['responding_visitors'], '人'));
+render_stat('のべ来場者', count_label($summary['visits'], '人'), '各企業の回答者数の合計');
 render_stat('総回答数', count_label($summary['responses']), '重複' . $summary['duplicates'] . '件を除く');
 render_stat('平均訪問企業数', (string) $summary['avg_companies'] . '社', '1人あたり');
 render_stat('メール登録', count_label($summary['emails'], '人'), '総合アンケートの案内先');
@@ -211,7 +212,18 @@ foreach ($ranking as $row) {
 if ($ranking === []) {
     echo '<tr><td colspan="5" class="muted">企業が登録されていません。</td></tr>';
 }
-echo '</tbody></table></div>';
+echo '</tbody>';
+// 合計行（回答者数の合計が「のべ来場者」になる）
+if ($ranking !== []) {
+    echo '<tfoot><tr>';
+    echo '<th>合計</th>';
+    echo '<th class="num">' . array_sum(array_column($ranking, 'responses')) . '</th>';
+    echo '<th class="num">' . $summary['visits'] . '</th>';
+    echo '<th class="num muted">' . array_sum(array_column($ranking, 'duplicates')) . '</th>';
+    echo '<th class="muted">のべ来場者</th>';
+    echo '</tr></tfoot>';
+}
+echo '</table></div>';
 echo '<div class="btn-row">';
 echo '<a class="btn" href="companies.php?event=' . $eventId . '">企業・QRコードの管理</a>';
 echo '<a class="btn" href="export_csv.php?event=' . $eventId . '">全企業分のCSV</a>';

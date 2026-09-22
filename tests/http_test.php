@@ -878,6 +878,14 @@ $addResponse($v3, 'I-B', $today . ' 12:00:00', '4');
 $addResponse($v3, 'I-A', $today . ' 12:10:00', '4');
 $addResponse($v3, 'I-C', $today . ' 12:40:00', '4');
 
+// のべ来場者＝各企業の回答者数の合計（v1が2社・v2が1社・v3が3社で計6人）
+$insightSummary = event_summary($insightEventId);
+check('total visits counts one per visitor and booth', $insightSummary['visits'] === 6,
+    'visits=' . $insightSummary['visits']);
+check('unique visitors are counted separately', $insightSummary['responding_visitors'] === 3);
+check('total visits equals the sum of the per-company visitor counts',
+    array_sum(array_column(company_response_ranking($insightEventId), 'visitors')) === $insightSummary['visits']);
+
 $laps    = visitor_laps($insightEventId);
 $lapTime = lap_time_stats($laps);
 $lapCos  = lap_company_stats($laps);
@@ -952,6 +960,8 @@ check('reception cannot open the insights page', $res['status'] === 404);
 $res = request('GET', '/admin/index.php?event=' . $insightEventId, null, 'org');
 check('the dashboard links to the insights page', str_contains($res['body'], 'insights.php'));
 check('the dashboard shows the average lap time', str_contains($res['body'], '平均 周回時間'));
+check('the dashboard shows the total visits tile', str_contains($res['body'], 'のべ来場者'));
+check('the total visits tile explains the calculation', str_contains($res['body'], '各企業の回答者数の合計'));
 
 // 後片付け（このイベントぶんだけ消す）
 $cleanup = db()->prepare('DELETE FROM events WHERE id = ?');

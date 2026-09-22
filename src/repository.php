@@ -627,7 +627,9 @@ function company_response_ranking(int $eventId): array
 /**
  * イベント全体のサマリー。
  *
- * @return array{visitors: int, responding_visitors: int, responses: int, duplicates: int,
+ * visits は「のべ来場者」＝各企業の回答者数の合計（1人が3社回れば3人）。
+ *
+ * @return array{visitors: int, responding_visitors: int, visits: int, responses: int, duplicates: int,
  *               avg_companies: float, emails: int, claims: int, claimed: int, overall_responses: int}
  */
 function event_summary(int $eventId): array
@@ -647,6 +649,16 @@ function event_summary(int $eventId): array
     );
     $stmt->execute([$eventId]);
     $row = $stmt->fetch(PDO::FETCH_NUM) ?: [0, 0, 0];
+
+    // のべ来場者＝各企業の回答者数を足し上げた数（1人が3社回れば3人と数える）。
+    // 同じ企業への再送信は1人として数える。
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(DISTINCT r.visitor_id, s.company_id)
+         FROM responses r JOIN surveys s ON s.id = r.survey_id
+         WHERE s.event_id = ? AND s.type = 'company' AND r.is_duplicate = 0"
+    );
+    $stmt->execute([$eventId]);
+    $visits = (int) $stmt->fetchColumn();
 
     $stmt = $pdo->prepare(
         "SELECT COALESCE(AVG(cnt), 0) FROM (
@@ -675,6 +687,7 @@ function event_summary(int $eventId): array
     return [
         'visitors'            => $visitors,
         'responding_visitors' => (int) $row[0],
+        'visits'              => $visits,
         'responses'           => (int) $row[1],
         'duplicates'          => (int) $row[2],
         'avg_companies'       => round($avg, 2),
