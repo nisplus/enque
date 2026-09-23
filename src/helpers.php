@@ -166,6 +166,27 @@ function is_valid_email(string $email): bool
     return strlen($email) <= 255 && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
 }
 
+/**
+ * 画面に出すときの伏せ字（例：taro@example.jp → ta***@example.jp）。
+ *
+ * 回答済み画面は総合受付にQRを見せる画面なので、そのまま出さずにここを通す。
+ * ドメインは残す。打ち間違いで多いのはドメイン（gmai.com など）で、
+ * 本人が「届かないアドレスかどうか」を見分ける手がかりになるため。
+ */
+function mask_email(string $email): string
+{
+    $at = strrpos($email, '@');
+    if ($at === false || $at === 0) {
+        return '***';
+    }
+
+    $local  = substr($email, 0, $at);
+    $domain = substr($email, $at);
+    $keep   = mb_strlen($local) >= 3 ? 2 : 1;
+
+    return mb_substr($local, 0, $keep) . '***' . $domain;
+}
+
 /** 企業アンケートの公開URL */
 function survey_url(string $eventSlug, string $companySlug): string
 {

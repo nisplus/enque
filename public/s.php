@@ -69,10 +69,12 @@ render_survey_page([
     'survey'      => $survey,
     'questions'   => $questions,
     'hidden'      => ['survey_id' => (string) $survey['id']],
-    'ask_email'   => ($visitor['email'] ?? null) === null,
+    // 登録済みでも欄は出す。2社目以降も自分のアドレスを確認・修正できるようにするため
+    'ask_email'   => true,
+    'email_known' => ($visitor['email'] ?? null) !== null,
     'previous'    => $previous,
     'invalid'     => [],
     'error'       => submit_error_message(get_string('err')),
-    'email_value' => '',
+    'email_value' => (string) ($visitor['email'] ?? ''),
     'footer_note' => '送信後、総合受付で提示できる交換コードが表示されます。ほかの参加企業のアンケートでも同じスマホ・同じブラウザで読み取ると、1つの交換コードにまとまります。',
 ]);

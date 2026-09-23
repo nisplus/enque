@@ -1074,6 +1074,76 @@ $claim2 = find_claim_by_code($claimCode2);
 $visitor2Row = find_visitor((int) $claim2['visitor_id']);
 check('the email lands on the right visitor', (string) ($visitor2Row['email'] ?? '') === $lateEmail);
 
+echo "=== email confirmation ===\n";
+
+// 回答中の画面を見るので、いったん受付中に戻す（このあとで閉め直す）
+update_event($eventId, (string) $event['name'], (string) $event['start_date'],
+    (string) $event['end_date'], 'open');
+
+// 登録済みの人は、2社目以降の画面で自分のアドレスを確認・修正できる
+$claim1    = find_claim_by_code($claimCode);
+$visitor1  = (int) $claim1['visitor_id'];
+$knownMail = 'known+' . $stamp . '@example.jp';
+set_visitor_email($visitor1, $knownMail);
+
+$res = request('GET', $surveyPath, null, 'visitor');
+check('the survey page fills in the registered address',
+    str_contains($res['body'], 'value="' . $knownMail . '"'), 'status=' . $res['status']);
+check('the survey page says the address is already registered',
+    str_contains($res['body'], '登録済みのアドレスです'));
+
+// 回答済み画面は交換コードのQRを受付に見せる画面なので、伏せ字で出す
+$donePath = '/done.php?e=' . $eventSlug . '&c=' . rawurlencode($claimCode);
+$res = request('GET', $donePath, null, 'visitor');
+check('the done page masks the address',
+    str_contains($res['body'], mask_email($knownMail)), 'status=' . $res['status']);
+check('the done page hides the full address', !str_contains($res['body'], $knownMail));
+check('the done page offers a way to change it',
+    str_contains($res['body'], '登録したメールアドレスを変更する'));
+
+// 変更できる。直後の1回だけは、確認のためそのまま出す
+$changedMail = 'changed+' . $stamp . '@example.jp';
+$res = request('POST', $donePath, ['c' => $claimCode, 'email' => $changedMail], 'visitor');
+check('changing the address is accepted',
+    $res['status'] === 200 && str_contains($res['body'], 'メールアドレスを変更しました'), 'status=' . $res['status']);
+check('the new address is shown once, right after the change', str_contains($res['body'], $changedMail));
+check('the change is stored',
+    (string) (find_visitor($visitor1)['email'] ?? '') === $changedMail);
+
+// 欄を空にして送信しても、登録済みのアドレスは消えない
+$res = request('POST', '/submit.php', [
+    'survey_id'            => (string) $surveyAId,
+    'q[' . $qSingle . ']'  => '情報収集',
+    'q[' . $qMulti . '][]' => ['製品'],
+    'q[' . $qRating . ']'  => '4',
+    'q[' . $qText . ']'    => '',
+    'email'                => '',
+], 'visitor', ['Accept: application/json']);
+check('an empty field keeps the registered address',
+    (string) (find_visitor($visitor1)['email'] ?? '') === $changedMail, 'status=' . $res['status']);
+
+// 未送信の案内行は新しいアドレスに揃え、送信済みの行は送った宛先を残す
+$visitor2Id = (int) $claim2['visitor_id'];
+create_pending_invites($eventId);
+$inviteMail = db()->prepare('SELECT email FROM overall_invites WHERE visitor_id = ?');
+$inviteMail->execute([$visitor2Id]);
+check('the invite row starts from the registered address',
+    (string) $inviteMail->fetchColumn() === $lateEmail);
+
+$lateMail2 = 'late2+' . $stamp . '@example.jp';
+set_visitor_email($visitor2Id, $lateMail2);
+$inviteMail->execute([$visitor2Id]);
+check('a pending invite follows the change', (string) $inviteMail->fetchColumn() === $lateMail2);
+
+db()->prepare("UPDATE overall_invites SET status = 'sent' WHERE visitor_id = ?")->execute([$visitor2Id]);
+set_visitor_email($visitor2Id, 'sent+' . $stamp . '@example.jp');
+$inviteMail->execute([$visitor2Id]);
+check('a sent invite keeps the address it was sent to',
+    (string) $inviteMail->fetchColumn() === $lateMail2);
+
+update_event($eventId, (string) $event['name'], (string) $event['start_date'],
+    (string) $event['end_date'], 'closed');
+
 echo "=== admin title ===\n";
 
 $res = request('GET', '/admin/index.php', null, 'org');

@@ -5,7 +5,8 @@ declare(strict_types=1);
  * 回答済み画面（来場者向け）。
  *
  * 交換コードを表示し、総合受付でそのまま提示できるようにする。
- * 何社まわったか、まだメールアドレスを登録していなければその入力欄も出す。
+ * 何社まわったかを見せ、メールアドレスが未登録なら入力欄を、登録済みなら
+ * 伏せ字での確認と変更欄を出す（この画面は受付にQRを見せるため、そのままは出さない）。
  *
  * URLに交換コードを付けて開ける（/done.php?e=<イベント>&c=<コード>）。
  * Cookieが消えたり別のブラウザで開いたりしても、ブックマークやスクリーンショットの
@@ -78,13 +79,15 @@ if ($visited === []) {
 }
 
 // メールアドレスの後追い登録
-$saved = false;
-$error = null;
+$saved   = false;
+$changed = false;
+$error   = null;
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $email = trim_ja((string) (post_string('email') ?? ''));
     if ($email === '' || !is_valid_email($email)) {
         $error = 'メールアドレスの形式が正しくありません。';
     } else {
+        $changed = ($visitor['email'] ?? null) !== null;
         set_visitor_email((int) $visitor['id'], $email);
         $visitor['email'] = $email;
         $saved = true;
@@ -125,7 +128,9 @@ foreach ($visited as $row) {
 echo '</ul>';
 
 if ($saved) {
-    echo '<div class="alert alert-success">メールアドレスを登録しました。イベント終了後にご案内をお送りします。</div>';
+    // 自分で入力した直後の1回だけは、そのまま出して確認してもらう
+    echo '<div class="alert alert-success">メールアドレスを' . ($changed ? '変更' : '登録') . 'しました（<strong>'
+        . e((string) $visitor['email']) . '</strong>）。イベント終了後にご案内をお送りします。</div>';
 }
 if ($error !== null) {
     echo '<div class="alert alert-error">' . e($error) . '</div>';
@@ -146,7 +151,21 @@ if (($visitor['email'] ?? null) === null) {
     echo '</form>';
     echo '</div>';
 } else {
-    echo '<div class="alert alert-info">イベント終了後、ご登録のメールアドレス宛に' . e(overall_label()) . 'のご案内をお送りします。</div>';
+    // この画面は交換コードのQRを受付に見せる画面なので、アドレスは伏せ字で出す
+    echo '<div class="alert alert-info">イベント終了後、<strong>' . e(mask_email((string) $visitor['email']))
+        . '</strong> 宛に' . e(overall_label()) . 'のご案内をお送りします。</div>';
+    echo '<details class="card">';
+    echo '<summary>登録したメールアドレスを変更する</summary>';
+    echo '<p class="muted">新しいアドレスを入力して「変更する」を押してください。';
+    echo '古いアドレスには案内をお送りしません。</p>';
+    echo '<form method="post">';
+    echo '<input type="hidden" name="c" value="' . e($code) . '">';
+    echo '<label class="field" for="email">新しいメールアドレス</label>';
+    echo '<input type="email" id="email" name="email" autocomplete="email" inputmode="email" '
+        . 'placeholder="example@example.jp" required>';
+    echo '<div class="btn-row"><button type="submit" class="btn">変更する</button></div>';
+    echo '</form>';
+    echo '</details>';
 }
 
 // スタッフがログインしていない状態でQRを読み取った場合の逃げ道

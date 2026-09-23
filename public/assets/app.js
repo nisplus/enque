@@ -36,7 +36,8 @@
     var elements = form.querySelectorAll('input, textarea, select');
     for (var i = 0; i < elements.length; i++) {
       var el = elements[i];
-      if (!el.name || el.name === 'csrf_token') {
+      // メールアドレスは端末に残さない（登録済みならサーバー側から埋め戻される）
+      if (!el.name || el.name === 'csrf_token' || el.name === 'email') {
         continue;
       }
       if (el.type === 'checkbox' || el.type === 'radio') {

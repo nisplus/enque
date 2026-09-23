@@ -267,6 +267,10 @@ tr.is-duplicate td { color: var(--text-muted); }
 
 details.answers-detail summary { cursor: pointer; color: var(--accent); }
 
+/* 回答済み画面の「メールアドレスを変更する」 */
+details.card > summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+details.card[open] > summary { margin-bottom: 8px; }
+
 /* 管理画面の設問エディタ ---------------------------------------------------- */
 /* scroll-margin-top は #q-new へ飛んだときに固定ヘッダーで隠れないようにするため */
 .q-editor {

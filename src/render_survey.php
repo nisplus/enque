@@ -17,6 +17,7 @@ require_once __DIR__ . '/view.php';
  *   questions: list<array<string,mixed>>,
  *   hidden: array<string,string>,
  *   ask_email: bool,
+ *   email_known?: bool,
  *   previous: array<int,mixed>,
  *   invalid: list<int>,
  *   error: ?string,
@@ -71,11 +72,19 @@ function render_survey_page(array $view): void
     }
 
     if ($view['ask_email']) {
+        // 登録済みの人には、確認できるよう入れてあるアドレスを埋めて出す。
+        // 本人だけが見ている入力画面なので伏せ字にはしない（打ち間違いに気づけるように）。
+        $known = ($view['email_known'] ?? false) === true;
         echo '<div class="card">';
         echo '<label class="field" for="email">メールアドレス（任意）';
-        echo '<span class="hint">イベント終了後に「' . e(overall_label()) . '」のご案内をお送りします。';
-        echo 'ご回答いただくと、' . e(wallpaper_label()) . 'をダウンロードできます。';
-        echo '入力は任意で、他の個人情報はお伺いしません。</span></label>';
+        if ($known) {
+            echo '<span class="hint">登録済みのアドレスです。<strong>間違いがあれば書き換えて送信してください。</strong>';
+            echo 'このまま送信しても、空欄にして送信しても、登録内容は変わりません。</span></label>';
+        } else {
+            echo '<span class="hint">イベント終了後に「' . e(overall_label()) . '」のご案内をお送りします。';
+            echo 'ご回答いただくと、' . e(wallpaper_label()) . 'をダウンロードできます。';
+            echo '入力は任意で、他の個人情報はお伺いしません。</span></label>';
+        }
         echo '<input type="email" id="email" name="email" autocomplete="email" inputmode="email" '
             . 'value="' . e($view['email_value']) . '" placeholder="example@example.jp">';
         echo '</div>';

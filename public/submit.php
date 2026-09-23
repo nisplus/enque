@@ -126,11 +126,13 @@ $view = [
     'hidden'      => $type === 'overall'
         ? ['survey_id' => (string) $survey['id'], 't' => (string) ($invite['token'] ?? '')]
         : ['survey_id' => (string) $survey['id']],
-    'ask_email'   => $type === 'company' && ($visitor['email'] ?? null) === null,
+    'ask_email'   => $type === 'company',
+    'email_known' => ($visitor['email'] ?? null) !== null,
     'previous'    => $previous,
     'invalid'     => [],
     'error'       => null,
-    'email_value' => $emailInput,
+    // エラーで戻すときは入力した値を優先し、空欄なら登録済みのアドレスを埋め戻す
+    'email_value' => $emailInput !== '' ? $emailInput : (string) ($visitor['email'] ?? ''),
     'footer_note' => $type === 'company' ? '送信後、総合受付で提示できる交換コードが表示されます。ほかの参加企業のアンケートでも同じスマホ・同じブラウザで読み取ると、1つの交換コードにまとまります。' : null,
 ];
 

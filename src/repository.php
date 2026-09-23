@@ -355,11 +355,21 @@ function find_visitor(int $id): ?array
     return $row === false ? null : $row;
 }
 
-/** 任意入力のメールアドレスを保存する（後から上書きも可能） */
+/**
+ * 任意入力のメールアドレスを保存する（後から書き換えられる）。
+ *
+ * 案内行は作られた時点のアドレスを持っているため、まだ送っていない行は
+ * 新しいアドレスに揃える。送信済みの行は履歴として残す。
+ */
 function set_visitor_email(int $visitorId, string $email): void
 {
     $stmt = db()->prepare('UPDATE visitors SET email = ?, email_purged = 0 WHERE id = ?');
     $stmt->execute([$email, $visitorId]);
+
+    $sync = db()->prepare(
+        "UPDATE overall_invites SET email = ? WHERE visitor_id = ? AND status <> 'sent'"
+    );
+    $sync->execute([$email, $visitorId]);
 }
 
 // ================================================================ 回答

@@ -223,6 +223,15 @@ check('escaping covers quotes', e('<a href="x">&</a>') === '&lt;a href=&quot;x&q
 check('full-width spaces are trimmed', trim_ja('　あ　') === 'あ');
 check('email validation accepts a normal address', is_valid_email('user@example.jp'));
 check('email validation rejects a broken address', !is_valid_email('user@@example'));
+
+// 伏せ字。ドメインは残す（ドメインの打ち間違いは本人に気づいてほしいため）
+check('the local part is masked', mask_email('taro@example.jp') === 'ta***@example.jp');
+check('a short local part keeps one letter', mask_email('ab@example.jp') === 'a***@example.jp');
+check('a single-letter local part still masks', mask_email('a@example.jp') === 'a***@example.jp');
+check('the last at sign wins', mask_email('a.b@c@example.jp') === 'a.***@example.jp');
+check('a broken address is fully masked', mask_email('example.jp') === '***');
+check('a multibyte local part is not cut mid-character',
+    mask_email('あいうえ@example.jp') === 'あい***@example.jp');
 check('utf8 validation walks nested arrays',
     is_valid_utf8(['a' => ['b' => 'あ']]) && !is_valid_utf8(['a' => ["\xC3\x28"]]));
 
