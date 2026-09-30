@@ -139,8 +139,7 @@ if ($error !== null) {
 if (($visitor['email'] ?? null) === null) {
     echo '<div class="card">';
     echo '<h2 style="margin-top:0">スマホ壁紙をご希望の方へ</h2>';
-    echo '<p>イベント終了後に「' . e(overall_label()) . '」のご案内をお送りします。ご回答いただくと、';
-    echo e(wallpaper_label()) . 'をダウンロードできます。</p>';
+    echo '<p>イベント終了後に、' . e(wallpaper_label()) . 'のダウンロード案内をお送りします。</p>';
     echo '<form method="post">';
     // コード付きで開いている場合も、送信先を同じ来場者に保つ
     echo '<input type="hidden" name="c" value="' . e($code) . '">';
@@ -153,7 +152,7 @@ if (($visitor['email'] ?? null) === null) {
 } else {
     // この画面は交換コードのQRを受付に見せる画面なので、アドレスは伏せ字で出す
     echo '<div class="alert alert-info">イベント終了後、<strong>' . e(mask_email((string) $visitor['email']))
-        . '</strong> 宛に' . e(overall_label()) . 'のご案内をお送りします。</div>';
+        . '</strong> 宛に' . e(wallpaper_label()) . 'のご案内をお送りします。</div>';
     echo '<details class="card">';
     echo '<summary>登録したメールアドレスを変更する</summary>';
     echo '<p class="muted">新しいアドレスを入力して「変更する」を押してください。';

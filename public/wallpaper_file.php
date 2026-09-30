@@ -13,7 +13,7 @@ require_once dirname(__DIR__) . '/src/bootstrap.php';
 
 $token  = (string) (get_string('t') ?? '');
 $invite = $token === '' ? null : find_invite_by_token($token);
-if ($invite === null || ($invite['responded_at'] ?? null) === null) {
+if ($invite === null || !invite_answered($invite)) {
     abort(404, 'この画像は表示できません。');
 }
 

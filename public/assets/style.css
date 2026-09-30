@@ -265,6 +265,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .table-scroll { overflow-x: auto; }
 tr.is-duplicate td { color: var(--text-muted); }
 
+/* 共通アンケート（ブースのアンケートに混ぜて1回だけ聞く） */
+.common-block { margin-top: 24px; padding-top: 4px; border-top: 2px solid var(--border); }
+.common-block h2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
 details.answers-detail summary { cursor: pointer; color: var(--accent); }
 
 /* 回答済み画面の「メールアドレスを変更する」 */

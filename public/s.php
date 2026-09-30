@@ -68,6 +68,8 @@ render_survey_page([
     'company'     => $company,
     'survey'      => $survey,
     'questions'   => $questions,
+    // イベント全体についての設問。まだ答えていない人にだけ、この画面で1回だけ出す
+    'common'      => common_survey_block($event, (int) $visitor['id']),
     'hidden'      => ['survey_id' => (string) $survey['id']],
     // 登録済みでも欄は出す。2社目以降も自分のアドレスを確認・修正できるようにするため
     'ask_email'   => true,

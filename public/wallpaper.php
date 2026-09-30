@@ -16,8 +16,8 @@ if ($invite === null) {
     abort(404, 'このURLは無効です。メールに記載されたリンクをもう一度お試しください。');
 }
 
-// 総合アンケートに回答していなければ、まず回答画面へ
-if (($invite['responded_at'] ?? null) === null) {
+// 共通アンケートに答えていなければ、まず回答画面へ（会期中の回答も見る）
+if (!invite_answered($invite)) {
     redirect('/o.php?t=' . rawurlencode($token));
 }
 

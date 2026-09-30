@@ -108,10 +108,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (post_string('action') ?
     if (!in_array($status, ['draft', 'open', 'closed'], true)) {
         $status = 'draft';
     }
+    $commonFrom = (int) (post_string('common_survey_from') ?? '1');
+    if (!in_array($commonFrom, [1, 2], true)) {
+        $commonFrom = 1;
+    }
     if ($name === '') {
         flash_set('error', 'イベント名を入力してください。');
     } else {
-        update_event($eventId, mb_substr($name, 0, 255), $start !== '' ? $start : null, $end !== '' ? $end : null, $status);
+        update_event($eventId, mb_substr($name, 0, 255), $start !== '' ? $start : null,
+            $end !== '' ? $end : null, $status, $commonFrom);
         flash_set('success', 'イベント設定を保存しました。');
     }
     redirect('index.php?event=' . $eventId);
@@ -167,6 +172,14 @@ $invites  = invite_stats($eventId);
 echo '<h2>' . e((string) $event['name']) . '<span class="badge badge-'
     . ((string) $event['status'] === 'open' ? 'good' : 'optional') . '">'
     . e(event_status_label((string) $event['status'])) . '</span></h2>';
+
+// 共通アンケートは会期中にブースのアンケートへ混ぜて集めるため、開催前に公開しておく必要がある
+if ((string) $event['status'] !== 'closed'
+    && ($overall === null || (int) $overall['is_published'] !== 1 || questions_for_survey((int) $overall['id']) === [])) {
+    echo '<div class="alert alert-warn">' . e(overall_label()) . 'がまだ公開されていません。';
+    echo 'ブースのアンケートに混ぜて集める仕組みのため、<strong>開催中に公開していないと1件も集まりません</strong>。';
+    echo '<a href="invites.php?event=' . $eventId . '">' . e(overall_label()) . 'の設定</a>から設問を登録して公開してください。</div>';
+}
 
 echo '<div class="stat-grid">';
 $party = party_size_stats($eventId);
@@ -270,12 +283,27 @@ echo '<input type="date" id="ev-start" name="start_date" value="' . e((string) (
 echo '<label class="field" for="ev-end">開催日（終了）</label>';
 echo '<input type="date" id="ev-end" name="end_date" value="' . e((string) ($event['end_date'] ?? '')) . '">';
 echo '<label class="field" for="ev-status">状態<span class="hint">';
-echo '「開催中」の間だけブースのアンケートに回答できます。終了にすると回答を締め切り、総合アンケートの案内を送れます。';
+echo '「開催中」の間だけブースのアンケートに回答できます（' . e(overall_label()) . 'もこの間に集めます）。';
+echo '終了にすると回答を締め切り、壁紙のご案内メールを送れます。';
 echo '</span></label>';
 echo '<select id="ev-status" name="status">';
 foreach (['draft', 'open', 'closed'] as $status) {
     $selected = (string) $event['status'] === $status ? ' selected' : '';
     echo '<option value="' . $status . '"' . $selected . '>' . e(event_status_label($status)) . '</option>';
+}
+echo '</select>';
+
+// 共通アンケートを出すタイミング
+$commonFrom = (int) ($event['common_survey_from'] ?? 1);
+echo '<label class="field" for="ev-common">' . e(overall_label()) . 'を出すタイミング<span class="hint">';
+echo 'ブースのアンケートの下に、まだ答えていない方にだけ1回だけ表示します。';
+echo '<strong>1社目から</strong>は取りこぼしが少なく、<strong>2社目から</strong>は';
+echo '会場をひと通り見てから答えてもらえます（1社だけ回って帰る方からは集まりません）。';
+echo '</span></label>';
+echo '<select id="ev-common" name="common_survey_from">';
+foreach ([1 => '1社目から（推奨）', 2 => '2社目から'] as $value => $label) {
+    $selected = $commonFrom === $value ? ' selected' : '';
+    echo '<option value="' . $value . '"' . $selected . '>' . e($label) . '</option>';
 }
 echo '</select>';
 echo '<div class="btn-row"><button type="submit" class="btn btn-primary">保存する</button></div>';

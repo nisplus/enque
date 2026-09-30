@@ -13,36 +13,62 @@ require_once __DIR__ . '/mailer.php';
 /**
  * 案内メールの件名と本文。
  *
+ * 会期中にブースで共通アンケートへ答えた方には、壁紙のご案内だけを送る。
+ * まだ答えていない方には、これまでどおり回答をお願いする（回答後に壁紙へ進む）。
+ *
  * @return array{subject: string, body: string}
  */
-function build_invite_mail(array $event, string $token): array
+function build_invite_mail(array $event, string $token, bool $answered = false): array
 {
-    $url       = overall_url($token);
     $name      = (string) $event['name'];
     // アンケートと壁紙の呼び名は .env（OVERALL_SURVEY_LABEL / WALLPAPER_LABEL）で決める
     $survey    = overall_label();
     $wallpaper = wallpaper_label();
 
-    $subject = '【' . $name . '】' . $survey . 'のお願い（' . $wallpaper . 'プレゼント）';
+    if ($answered) {
+        $url     = wallpaper_url($token);
+        $subject = '【' . $name . '】' . $wallpaper . 'のご案内';
 
-    $body = <<<TEXT
-    このたびは「{$name}」にご来場いただき、ありがとうございました。
+        $body = <<<TEXT
+        このたびは「{$name}」にご来場いただき、ありがとうございました。
+        会場でのアンケートにもご協力いただき、重ねてお礼申し上げます。
 
-    会場のブースでアンケートにご回答いただいた皆さまに、
-    イベント全体についてお伺いする{$survey}をお願いしております。
+        お礼として、{$wallpaper}をご用意しました。
+        下記のURLからダウンロードいただけます。
 
-    ご回答いただくと、その場で{$wallpaper}をダウンロードいただけます。
+        ▼ ダウンロードはこちら
+        {$url}
 
-    ▼ 回答はこちら（所要3分ほど）
-    {$url}
+        ※ このURLはお客さま専用です。転送しないようお願いいたします。
+        ※ お預かりしたメールアドレスは本ご案内にのみ使用し、
+        　 送付・集計の完了後に削除します。
+        ※ 本メールは送信専用です。ご返信いただいてもお答えできません。
 
-    ※ このURLはお客さま専用です。転送しないようお願いいたします。
-    ※ お預かりしたメールアドレスは本アンケートのご案内にのみ使用し、
-    　 送付・集計の完了後に削除します。
-    ※ 本メールは送信専用です。ご返信いただいてもお答えできません。
+        {$name} 事務局
+        TEXT;
+    } else {
+        $url     = overall_url($token);
+        $subject = '【' . $name . '】' . $survey . 'のお願い（' . $wallpaper . 'プレゼント）';
 
-    {$name} 事務局
-    TEXT;
+        $body = <<<TEXT
+        このたびは「{$name}」にご来場いただき、ありがとうございました。
+
+        会場のブースでアンケートにご回答いただいた皆さまに、
+        イベント全体についてお伺いする{$survey}をお願いしております。
+
+        ご回答いただくと、その場で{$wallpaper}をダウンロードいただけます。
+
+        ▼ 回答はこちら（所要3分ほど）
+        {$url}
+
+        ※ このURLはお客さま専用です。転送しないようお願いいたします。
+        ※ お預かりしたメールアドレスは本アンケートのご案内にのみ使用し、
+        　 送付・集計の完了後に削除します。
+        ※ 本メールは送信専用です。ご返信いただいてもお答えできません。
+
+        {$name} 事務局
+        TEXT;
+    }
 
     // ヒアドキュメントのインデントを外す
     $body = preg_replace('/^[ \t]+/m', '', $body) ?? $body;
@@ -80,7 +106,7 @@ function send_pending_invites(int $eventId, int $limit = 100, ?callable $log = n
             continue;
         }
 
-        $mail = build_invite_mail($event, (string) $invite['token']);
+        $mail = build_invite_mail($event, (string) $invite['token'], invite_answered($invite));
         try {
             send_mail($email, $mail['subject'], $mail['body']);
             mark_invite_sent((int) $invite['id']);

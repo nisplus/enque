@@ -174,7 +174,8 @@ $qMulti     = (int) $questionsA[1]['id'];
 $qRating    = (int) $questionsA[2]['id'];
 $qText      = (int) $questionsA[3]['id'];
 
-$overallId = create_survey($eventId, null, 'overall', 'TEST OVERALL', null, true);
+// 共通アンケートは「=== common survey ===」で公開する（会期中に集める流れを再現するため）
+$overallId = create_survey($eventId, null, 'overall', 'TEST OVERALL', null, false);
 replace_questions($overallId, [
     ['id' => null, 'type' => 'rating', 'label' => '全体満足度', 'options' => [], 'required' => true],
 ]);
@@ -777,6 +778,91 @@ register_shutdown_function(static function () use ($wallpapers): void {
     }
 });
 
+echo "=== common survey (mixed into the booth form) ===\n";
+
+// 会期中に集めるので、ここで公開する
+update_survey($overallId, 'TEST OVERALL', null, true);
+
+// 既定は「1社目から」。まだ答えていない来場者には、ブースの設問に続けて出す
+$res = request('GET', $surveyPath, null, 'common1');
+check('the common survey shows up in the booth form',
+    str_contains($res['body'], 'common-block'), 'status=' . $res['status']);
+check('the common question is part of the same form',
+    str_contains($res['body'], 'q[' . $overallQ . ']'));
+
+$commonBefore = count_responses($overallId);
+$res = request('POST', '/submit.php', [
+    'survey_id'            => (string) $surveyAId,
+    'q[' . $qSingle . ']'  => '情報収集',
+    'q[' . $qMulti . '][]' => ['製品'],
+    'q[' . $qRating . ']'  => '4',
+    'q[' . $qText . ']'    => '',
+    'q[' . $overallQ . ']' => '5',
+], 'common1', ['Accept: application/json']);
+$json = json_decode($res['body'], true);
+check('a booth answer carries the common answers', $res['status'] === 200 && ($json['ok'] ?? false) === true,
+    'status=' . $res['status']);
+check('the common answer is stored as its own response',
+    count_responses($overallId) === $commonBefore + 1);
+
+preg_match('/c=([2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4})/', (string) ($json['redirect'] ?? ''), $codeCommon);
+$commonClaim   = find_claim_by_code($codeCommon[1] ?? '');
+$commonVisitor = (int) ($commonClaim['visitor_id'] ?? 0);
+check('the common answer belongs to the same visitor', has_response($overallId, $commonVisitor));
+
+$commonValue = db()->prepare(
+    'SELECT a.value FROM answers a JOIN responses r ON r.id = a.response_id
+     WHERE r.survey_id = ? AND r.visitor_id = ? AND a.question_id = ?'
+);
+$commonValue->execute([$overallId, $commonVisitor, $overallQ]);
+check('the common answer keeps its value', (string) $commonValue->fetchColumn() === '5');
+
+// 2社目からは出さない（何社回っても入力は1回だけ）
+$surveyPathB = '/s/' . $eventSlug . '/' . (string) $companyB['qr_slug'];
+$res = request('GET', $surveyPathB, null, 'common1');
+check('the common survey is not asked twice', !str_contains($res['body'], 'common-block'));
+
+$commonBefore = count_responses($overallId);
+$res = request('POST', '/submit.php', [
+    'survey_id'            => (string) $surveyBId,
+    'q[' . $qB . ']'       => 'はい',
+    'q[' . $overallQ . ']' => '3',
+], 'common1', ['Accept: application/json']);
+check('a second common answer is ignored',
+    $res['status'] === 200 && count_responses($overallId) === $commonBefore, 'status=' . $res['status']);
+
+// 「2社目から」に変えると、1社目では出さずに2社目で出す
+update_event($eventId, (string) $event['name'], (string) $event['start_date'],
+    (string) $event['end_date'], 'open', 2);
+
+$res = request('GET', $surveyPath, null, 'common2');
+check('the 2nd-booth setting skips the first booth', !str_contains($res['body'], 'common-block'));
+
+$res = request('POST', '/submit.php', [
+    'survey_id'           => (string) $surveyAId,
+    'q[' . $qSingle . ']' => '情報収集',
+    'q[' . $qRating . ']' => '4',
+], 'common2', ['Accept: application/json']);
+check('the first booth is answered without the common part', $res['status'] === 200, 'status=' . $res['status']);
+
+$res = request('GET', $surveyPathB, null, 'common2');
+check('the 2nd-booth setting asks at the second booth', str_contains($res['body'], 'common-block'));
+
+update_event($eventId, (string) $event['name'], (string) $event['start_date'],
+    (string) $event['end_date'], 'open', 1);
+
+// メールの文面は、会期中に答えたかどうかで変わる
+$mailAnswered = build_invite_mail($event, 'testtoken', true);
+check('an answered visitor is sent straight to the wallpaper',
+    str_contains($mailAnswered['body'], wallpaper_url('testtoken'))
+    && !str_contains($mailAnswered['body'], overall_url('testtoken')));
+check('the wallpaper mail is titled after the wallpaper',
+    str_contains($mailAnswered['subject'], wallpaper_label()));
+
+$mailPending = build_invite_mail($event, 'testtoken', false);
+check('an unanswered visitor is still asked to answer',
+    str_contains($mailPending['body'], overall_url('testtoken')));
+
 echo "=== overall survey and wallpaper ===\n";
 
 $added = create_pending_invites($eventId);
@@ -832,6 +918,26 @@ check('answered link goes straight to the wallpaper page',
 
 $stats = invite_stats($eventId);
 check('invite is marked as responded', $stats['responded'] === 1);
+
+// 会期中に答えた人にも案内は届く。その人のリンクはアンケートを飛ばして壁紙へ
+set_visitor_email($commonVisitor, 'common+' . $stamp . '@example.jp');
+check('the visitor who answered in the booth gets an invite row too',
+    create_pending_invites($eventId) === 1);
+$commonInvite = db()->prepare('SELECT * FROM overall_invites WHERE visitor_id = ?');
+$commonInvite->execute([$commonVisitor]);
+$commonToken = (string) ($commonInvite->fetch()['token'] ?? '');
+
+$res = request('GET', '/o/' . $commonToken, null, 'common1');
+check('an answer given in the booth skips the survey link',
+    $res['status'] === 302 && str_contains((string) $res['location'], '/wallpaper.php'),
+    'status=' . $res['status']);
+
+$res = request('GET', '/wallpaper.php?t=' . $commonToken, null, 'common1');
+check('the wallpaper opens for a visitor who answered in the booth',
+    $res['status'] === 200 && str_contains($res['body'], 'TEST WALLPAPER'), 'status=' . $res['status']);
+
+$res = request('GET', '/wallpaper_file.php?t=' . $commonToken . '&id=' . $wallpaperId, null, 'common1');
+check('the image is served for that visitor as well', $res['status'] === 200);
 
 echo "=== visitor insights ===\n";
 
@@ -1048,11 +1154,16 @@ check('closed event rejects new submissions', $res['status'] === 400);
 
 echo "=== email purge ===\n";
 
+$responsesBeforePurge = count_responses($surveyAId);
+$emailStmt->execute([$eventId]);
+$emailsBeforePurge = (int) $emailStmt->fetchColumn();
 $result = purge_emails($eventId);
-check('emails are deleted after the campaign', $result['visitors'] === 1);
+check('emails are deleted after the campaign',
+    $emailsBeforePurge > 0 && $result['visitors'] === $emailsBeforePurge,
+    'before=' . $emailsBeforePurge . ' purged=' . $result['visitors']);
 $emailStmt->execute([$eventId]);
 check('no email remains for the event', (int) $emailStmt->fetchColumn() === 0);
-check('responses survive the purge', count_responses($surveyAId) === 2);
+check('responses survive the purge', count_responses($surveyAId) === $responsesBeforePurge);
 
 echo "=== email registration from the code url ===\n";
 
@@ -1166,7 +1277,7 @@ check('the mail body uses both labels',
     str_contains($mail['body'], overall_label()) && str_contains($mail['body'], wallpaper_label()));
 
 $res = done_page();
-check('the done page uses the survey label', str_contains($res['body'], overall_label()));
+check('the done page uses the wallpaper label', str_contains($res['body'], wallpaper_label()));
 
 $res = request('GET', '/admin/invites.php?event=' . $eventId, null, 'org');
 check('the admin page uses the survey label', str_contains($res['body'], overall_label()));

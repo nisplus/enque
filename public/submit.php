@@ -118,11 +118,16 @@ if (is_array($posted)) {
 }
 $emailInput = trim_ja((string) (post_string('email') ?? ''));
 
+// ブースのアンケートに混ぜた共通アンケート。出す条件を満たすときだけ受け付ける
+// （既に答えている人が送ってきても、ここで null になるので保存しない）
+$common = $type === 'company' ? common_survey_block($event, (int) $visitor['id']) : null;
+
 $view = [
     'event'       => $event,
     'company'     => $company,
     'survey'      => $survey,
     'questions'   => $questions,
+    'common'      => $common,
     'hidden'      => $type === 'overall'
         ? ['survey_id' => (string) $survey['id'], 't' => (string) ($invite['token'] ?? '')]
         : ['survey_id' => (string) $survey['id']],
@@ -156,6 +161,21 @@ foreach ($questions as $question) {
     $answers[$qid] = $result['value'];
 }
 
+// 共通アンケートのぶんは別の回答として保存するので、設問IDで分けて集める
+$commonAnswers = [];
+if ($common !== null) {
+    foreach ($common['questions'] as $question) {
+        $qid    = (int) $question['id'];
+        $result = validate_answer($question, $posted[$qid] ?? null);
+        if ($result['ok'] === false) {
+            $invalid[]  = $qid;
+            $firstErr ??= $result['error'];
+            continue;
+        }
+        $commonAnswers[$qid] = $result['value'];
+    }
+}
+
 if ($invalid !== []) {
     fail((string) $firstErr, $invalid, $view);
 }
@@ -171,6 +191,10 @@ try {
     }
 
     $result = insert_response($surveyId, (int) $visitor['id'], $answers);
+
+    if ($common !== null) {
+        insert_response((int) $common['survey']['id'], (int) $visitor['id'], $commonAnswers);
+    }
 
     if ($type === 'company') {
         // いずれか1社に回答した時点で交換コードを発行する。

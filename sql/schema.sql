@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS events (
   start_date  DATE NULL,
   end_date    DATE NULL,
   status      ENUM('draft','open','closed') NOT NULL DEFAULT 'draft',
+  -- 共通アンケート（type=overall）を何社目のブースから出すか（1 または 2）
+  common_survey_from TINYINT UNSIGNED NOT NULL DEFAULT 1,
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -143,7 +143,7 @@ $template  = template_survey((int) $survey['event_id']);
 
 $typeLabel = (string) $survey['type'];
 $heading   = match ($typeLabel) {
-    'overall'  => '総合アンケート',
+    'overall'  => overall_label(),
     'template' => '共通設問テンプレート',
     default    => (string) ($company['name'] ?? '') . ' のアンケート',
 };

@@ -2,7 +2,10 @@
 declare(strict_types=1);
 
 /**
- * 総合アンケートの回答画面（イベント終了後にメールで案内するURL）。
+ * 総合アンケートの回答画面（会期中に答えなかった人に、終了後のメールで案内するURL）。
+ *
+ * 会期中はブースのアンケートに混ぜて集めるため、この画面を開くのは
+ * 会場で答えなかった人だけになる（答えていれば壁紙の画面へ送る）。
  *
  *   /o/<トークン>      （mod_rewrite 経由）
  *   /o.php?t=<トークン>
@@ -47,8 +50,8 @@ if ($preview) {
         abort(404, 'このURLは無効です。');
     }
 
-    // 回答済みなら壁紙ダウンロード画面へ
-    if (($invite['responded_at'] ?? null) !== null) {
+    // 会期中にブースで答えた人も含め、回答済みなら壁紙ダウンロード画面へ
+    if (invite_answered($invite)) {
         redirect('/wallpaper.php?t=' . rawurlencode($token));
     }
 }

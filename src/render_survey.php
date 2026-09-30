@@ -18,6 +18,7 @@ require_once __DIR__ . '/view.php';
  *   hidden: array<string,string>,
  *   ask_email: bool,
  *   email_known?: bool,
+ *   common?: array{survey: array<string,mixed>, questions: list<array<string,mixed>>}|null,
  *   previous: array<int,mixed>,
  *   invalid: list<int>,
  *   error: ?string,
@@ -55,7 +56,11 @@ function render_survey_page(array $view): void
         echo 'この画面からは送信できません（回答は保存されません）。</div>';
     }
 
-    echo '<div class="progress"><span id="progress-text">' . count($questions) . '問中 0問に回答</span>';
+    // 共通アンケートを混ぜるときは、設問数（進捗の分母）もあわせて数える
+    $common      = $view['common'] ?? null;
+    $questionNum = count($questions) + (is_array($common) ? count($common['questions']) : 0);
+
+    echo '<div class="progress"><span id="progress-text">' . $questionNum . '問中 0問に回答</span>';
     echo '<span class="progress-bar"><span id="progress-bar-fill"></span></span></div>';
 
     echo '<div class="alert alert-info" id="draft-notice" hidden>前回入力した内容を復元しました。</div>';
@@ -71,6 +76,18 @@ function render_survey_page(array $view): void
         render_question($question, $view['previous'], in_array((int) $question['id'], $view['invalid'], true));
     }
 
+    // 共通アンケート。まだ答えていない来場者にだけ、ブースの設問に続けて出す
+    if (is_array($common)) {
+        echo '<div class="common-block">';
+        echo '<h2>' . e(overall_label()) . '<span class="badge badge-optional">この1回だけ</span></h2>';
+        echo '<p class="text-secondary">イベント全体についてお伺いします。';
+        echo 'ほかのブースでは表示されませんので、この画面でご回答ください。</p>';
+        foreach ($common['questions'] as $question) {
+            render_question($question, $view['previous'], in_array((int) $question['id'], $view['invalid'], true));
+        }
+        echo '</div>';
+    }
+
     if ($view['ask_email']) {
         // 登録済みの人には、確認できるよう入れてあるアドレスを埋めて出す。
         // 本人だけが見ている入力画面なので伏せ字にはしない（打ち間違いに気づけるように）。
@@ -81,8 +98,7 @@ function render_survey_page(array $view): void
             echo '<span class="hint">登録済みのアドレスです。<strong>間違いがあれば書き換えて送信してください。</strong>';
             echo 'このまま送信しても、空欄にして送信しても、登録内容は変わりません。</span></label>';
         } else {
-            echo '<span class="hint">イベント終了後に「' . e(overall_label()) . '」のご案内をお送りします。';
-            echo 'ご回答いただくと、' . e(wallpaper_label()) . 'をダウンロードできます。';
+            echo '<span class="hint">イベント終了後に' . e(wallpaper_label()) . 'のダウンロード案内をお送りします。';
             echo '入力は任意で、他の個人情報はお伺いしません。</span></label>';
         }
         echo '<input type="email" id="email" name="email" autocomplete="email" inputmode="email" '

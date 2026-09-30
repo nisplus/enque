@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * 総合アンケートと案内メールの管理（主催者）。
+ * 共通アンケート（会期中にブースのアンケートへ混ぜて集める）と案内メールの管理（主催者）。
  *
  * 大量送信は cron（bin/send_overall_invites.php）で行う前提で、この画面からは
  * 準備・テスト送信・少量の送信・状況確認・メールアドレスの削除を行う。
@@ -29,11 +29,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
     if ($action === 'create_overall') {
         if (overall_survey($eventId) === null) {
-            $id = create_survey($eventId, null, 'overall', (string) $event['name'] . ' 総合アンケート', null, false);
-            flash_set('success', '総合アンケートを作成しました。設問を登録してください。');
+            $id = create_survey($eventId, null, 'overall', (string) $event['name'] . ' ' . overall_label(), null, false);
+            flash_set('success', overall_label() . 'を作成しました。設問を登録してください。');
             redirect('survey_edit.php?survey=' . $id);
         }
-        flash_set('error', '総合アンケートはすでに作成されています。');
+        flash_set('error', overall_label() . 'はすでに作成されています。');
     } elseif ($action === 'create_template') {
         if (template_survey($eventId) === null) {
             $id = create_survey($eventId, null, 'template', '共通設問テンプレート', null, false);
@@ -88,10 +88,10 @@ $template = template_survey($eventId);
 $stats    = invite_stats($eventId);
 $summary  = event_summary($eventId);
 
-admin_page_header($user, '総合アンケート', 'invites.php');
+admin_page_header($user, overall_label(), 'invites.php');
 render_alert(flash_take());
 
-echo '<h1>総合アンケートと案内メール</h1>';
+echo '<h1>' . e(overall_label()) . 'と案内メール</h1>';
 echo '<p class="muted">' . e((string) $event['name']) . '（' . e(event_status_label((string) $event['status'])) . '）</p>';
 
 if (mail_is_configured()) {
@@ -103,19 +103,26 @@ if (mail_is_configured()) {
     echo '外部SMTPに直接接続する場合は <code class="mono">MAIL_TRANSPORT=smtp</code> と接続情報を設定してください。</div>';
 }
 
-// ---- 1. 総合アンケート
-echo '<div class="card"><h2 style="margin-top:0">1. 総合アンケートを用意する</h2>';
+// ---- 1. 共通アンケート（会期中にブースのアンケートへ混ぜて集める）
+echo '<div class="card"><h2 style="margin-top:0">1. ' . e(overall_label()) . 'を用意する（開催前に）</h2>';
+echo '<p class="muted">ブースのアンケートの下に、まだ答えていない来場者にだけ1回だけ表示します。';
+echo '<strong>開催中に公開されていないと1件も集まりません。</strong>会期前に設問を登録して公開してください。</p>';
 if ($overall === null) {
     echo '<p>まだ作成されていません。</p>';
     echo '<form method="post">' . csrf_field();
     echo '<input type="hidden" name="action" value="create_overall">';
     echo '<input type="hidden" name="event_id" value="' . $eventId . '">';
-    echo '<div class="btn-row"><button type="submit" class="btn btn-primary">総合アンケートを作成する</button></div>';
+    echo '<div class="btn-row"><button type="submit" class="btn btn-primary">'
+        . e(overall_label()) . 'を作成する</button></div>';
     echo '</form>';
 } else {
     echo '<p>' . e((string) $overall['title']) . ' <span class="badge badge-'
         . ((int) $overall['is_published'] === 1 ? 'good">公開中' : 'warn">非公開') . '</span></p>';
-    echo '<p class="muted">回答数：' . count_label($summary['overall_responses']) . '</p>';
+    echo '<p class="muted">回答数：' . count_label($summary['overall_responses'])
+        . '（回答した来場者 ' . count_label($summary['responding_visitors'], '人') . '中）</p>';
+    $fromNth = (int) ($event['common_survey_from'] ?? 1);
+    echo '<p class="muted">表示するタイミング：' . $fromNth . '社目から'
+        . '（ダッシュボードの「イベント設定」で変更できます）</p>';
     echo '<div class="btn-row">';
     echo '<a class="btn" href="survey_edit.php?survey=' . (int) $overall['id'] . '">設問を編集する</a>';
     echo '<a class="btn" href="responses.php?survey=' . (int) $overall['id'] . '">回答一覧</a>';
@@ -131,8 +138,11 @@ echo '<div class="stat-grid">';
 render_stat('未送信', count_label($stats['pending']));
 render_stat('送信済み', count_label($stats['sent']));
 render_stat('失敗', count_label($stats['failed']));
-render_stat('回答済み', count_label($stats['responded']));
+render_stat('メールから回答', count_label($stats['responded']), '会期中に答えた人は含まない');
 echo '</div>';
+echo '<p class="muted">メールの文面は相手によって変わります。会期中に' . e(overall_label())
+    . 'へ答えた方には<strong>' . e(wallpaper_label()) . 'のご案内だけ</strong>を送り、'
+    . 'まだ答えていない方には回答のお願い（回答後に壁紙）を送ります。</p>';
 echo '<form method="post">' . csrf_field();
 echo '<input type="hidden" name="action" value="prepare">';
 echo '<input type="hidden" name="event_id" value="' . $eventId . '">';

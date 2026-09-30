@@ -207,6 +207,12 @@ function overall_url(string $token): string
     return base_url() . '/o.php?t=' . rawurlencode($token);
 }
 
+/** 壁紙ダウンロード画面のURL（会期中に共通アンケートへ回答済みの人に送る） */
+function wallpaper_url(string $token): string
+{
+    return base_url() . '/wallpaper.php?t=' . rawurlencode($token);
+}
+
 /**
  * 交換コードのURL（回答済み画面のQRコードに入れる）。
  *

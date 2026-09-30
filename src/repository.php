@@ -50,12 +50,18 @@ function create_event(string $name, ?string $startDate, ?string $endDate, string
     return (int) db()->lastInsertId();
 }
 
-function update_event(int $id, string $name, ?string $startDate, ?string $endDate, string $status): void
-{
+function update_event(
+    int $id,
+    string $name,
+    ?string $startDate,
+    ?string $endDate,
+    string $status,
+    int $commonSurveyFrom = 1
+): void {
     $stmt = db()->prepare(
-        'UPDATE events SET name = ?, start_date = ?, end_date = ?, status = ? WHERE id = ?'
+        'UPDATE events SET name = ?, start_date = ?, end_date = ?, status = ?, common_survey_from = ? WHERE id = ?'
     );
-    $stmt->execute([$name, $startDate, $endDate, $status, $id]);
+    $stmt->execute([$name, $startDate, $endDate, $status, max(1, min(2, $commonSurveyFrom)), $id]);
 }
 
 // ================================================================ 企業
@@ -153,7 +159,7 @@ function survey_for_company(int $companyId): ?array
     return $row === false ? null : $row;
 }
 
-/** イベントの総合アンケート（type=overall）。無ければ null */
+/** イベントの共通アンケート（type=overall）。無ければ null */
 function overall_survey(int $eventId): ?array
 {
     $stmt = db()->prepare("SELECT * FROM surveys WHERE event_id = ? AND type = 'overall' LIMIT 1");
@@ -161,6 +167,45 @@ function overall_survey(int $eventId): ?array
     $row = $stmt->fetch();
 
     return $row === false ? null : $row;
+}
+
+/**
+ * ブースのアンケートに混ぜて出す共通アンケート。出さないときは null。
+ *
+ * 出す条件は、公開済みで設問があり、その来場者がまだ答えておらず、
+ * イベント設定の「何社目のブースから出すか」に達していること。
+ * 一度答えたら二度と出さないので、来場者は何社回っても入力は1回で済む。
+ *
+ * @param array<string,mixed> $event
+ * @return array{survey: array<string,mixed>, questions: list<array<string,mixed>>}|null
+ */
+function common_survey_block(array $event, int $visitorId): ?array
+{
+    $survey = overall_survey((int) $event['id']);
+    if ($survey === null || (int) $survey['is_published'] !== 1) {
+        return null;
+    }
+
+    $questions = questions_for_survey((int) $survey['id']);
+    if ($questions === [] || has_response((int) $survey['id'], $visitorId)) {
+        return null;
+    }
+
+    // 「2社目から」なら、1社ぶん答え終わってから出す
+    $from = max(1, (int) ($event['common_survey_from'] ?? 1));
+    if (visited_company_count($visitorId) + 1 < $from) {
+        return null;
+    }
+
+    return ['survey' => $survey, 'questions' => $questions];
+}
+
+/** その来場者が共通アンケートに答えているか */
+function has_answered_overall(int $eventId, int $visitorId): bool
+{
+    $survey = overall_survey($eventId);
+
+    return $survey !== null && has_response((int) $survey['id'], $visitorId);
 }
 
 /** イベントの共通設問テンプレート（type=template）。無ければ null */
@@ -1031,6 +1076,20 @@ function mark_invite_responded(int $inviteId): void
 {
     $stmt = db()->prepare('UPDATE overall_invites SET responded_at = NOW() WHERE id = ? AND responded_at IS NULL');
     $stmt->execute([$inviteId]);
+}
+
+/**
+ * その案内の来場者が共通アンケートに答えているか。
+ *
+ * 会期中にブースで答えた人には案内行の印（responded_at）が付かないため、
+ * 回答そのものを見て判定する。印は「案内メールから答えた」記録として残す。
+ *
+ * @param array<string,mixed> $invite
+ */
+function invite_answered(array $invite): bool
+{
+    return ($invite['responded_at'] ?? null) !== null
+        || has_answered_overall((int) $invite['event_id'], (int) $invite['visitor_id']);
 }
 
 /**
