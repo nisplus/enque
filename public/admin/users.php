@@ -115,7 +115,7 @@ echo '</form></div>';
 
 echo '<h2>登録済みのアカウント（' . count($users) . '件）</h2>';
 echo '<div class="card"><div class="table-scroll"><table>';
-echo '<thead><tr><th>ユーザー名</th><th>表示名</th><th>役割</th><th>担当企業</th><th>状態</th><th>操作</th></tr></thead><tbody>';
+echo '<thead><tr><th>ユーザー名</th><th>表示名</th><th>役割</th><th>担当企業</th><th>状態</th><th>最終ログイン</th><th>操作</th></tr></thead><tbody>';
 
 foreach ($users as $row) {
     $rowId = (int) $row['id'];
@@ -125,6 +125,11 @@ foreach ($users as $row) {
     echo '<td>' . e(role_label((string) $row['role'])) . '</td>';
     echo '<td>' . e((string) ($row['company_name'] ?? '')) . '</td>';
     echo '<td>' . ((int) $row['is_active'] === 1 ? '<span class="badge badge-good">有効</span>' : '<span class="badge badge-optional">無効</span>') . '</td>';
+    // 当日までにログインできているか（受付スタッフの事前確認）を見るために出す
+    $lastLogin = $row['last_login_at'] ?? null;
+    echo '<td class="nowrap">' . ($lastLogin === null
+        ? '<span class="muted">未ログイン</span>'
+        : e(format_datetime_ja((string) $lastLogin))) . '</td>';
     echo '<td>';
 
     echo '<form method="post" class="inline-form" onsubmit="return confirm(\'このアカウントの状態を変更します。よろしいですか？\');">' . csrf_field();

@@ -64,6 +64,49 @@ function update_event(
     $stmt->execute([$name, $startDate, $endDate, $status, max(1, min(2, $commonSurveyFrom)), $id]);
 }
 
+/**
+ * URL一覧ページ（ログイン不要）の合言葉。無ければ作る。
+ *
+ * ブースのURLから推測できないよう、イベントのスラグとは別の値にしている。
+ * 漏れたときは作り直せる（regenerate_event_share_token）。
+ */
+function event_share_token(int $eventId): string
+{
+    $event = find_event($eventId);
+    if ($event === null) {
+        throw new RuntimeException('イベントが見つかりません：' . $eventId);
+    }
+    $token = (string) ($event['share_token'] ?? '');
+    if ($token !== '') {
+        return $token;
+    }
+
+    return regenerate_event_share_token($eventId);
+}
+
+/** URL一覧ページの合言葉を作り直す（古いリンクは開けなくなる） */
+function regenerate_event_share_token(int $eventId): string
+{
+    $token = bin2hex(random_bytes(20));
+    $stmt  = db()->prepare('UPDATE events SET share_token = ? WHERE id = ?');
+    $stmt->execute([$token, $eventId]);
+
+    return $token;
+}
+
+/** 合言葉からイベントを引く。無ければ null */
+function find_event_by_share_token(string $token): ?array
+{
+    if ($token === '') {
+        return null;
+    }
+    $stmt = db()->prepare('SELECT * FROM events WHERE share_token = ?');
+    $stmt->execute([$token]);
+    $row = $stmt->fetch();
+
+    return $row === false ? null : $row;
+}
+
 // ================================================================ 企業
 
 /** @return list<array<string,mixed>> */
@@ -1300,6 +1343,13 @@ function update_admin_password(int $id, string $hash): void
 {
     $stmt = db()->prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?');
     $stmt->execute([$hash, $id]);
+}
+
+/** ログインできた時刻を記録する（アカウント管理画面に出す） */
+function touch_admin_login(int $id): void
+{
+    $stmt = db()->prepare('UPDATE admin_users SET last_login_at = NOW() WHERE id = ?');
+    $stmt->execute([$id]);
 }
 
 function set_admin_active(int $id, bool $active): void

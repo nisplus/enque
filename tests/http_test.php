@@ -524,6 +524,41 @@ check('the list of urls can be copied in one go',
 check('the list warns that opening the url counts as a visitor',
     str_contains($res['body'], 'ユニーク来場者'));
 
+// スタッフ共有用のURL一覧（ログイン不要。合言葉はイベントのスラグとは別）
+$shareToken = event_share_token($eventId);
+check('the share link is offered in the admin screen',
+    str_contains($res['body'], '/urls.php?t=' . $shareToken));
+check('the share token is not the event slug', $shareToken !== $eventSlug && strlen($shareToken) === 40);
+
+$res = request('GET', '/urls.php?t=' . $shareToken, null, 'nocookie');
+check('the shared list opens without logging in', $res['status'] === 200, 'status=' . $res['status']);
+check('the shared list shows every company',
+    str_contains($res['body'], 'TEST CO A') && str_contains($res['body'], 'TEST CO B'));
+check('the shared list links to the surveys', str_contains($res['body'], e($surveyLink)));
+check('the shared list is kept out of search engines', str_contains($res['headers'], 'noindex'));
+check('the shared list warns about the visitor count', str_contains($res['body'], 'ユニーク来場者'));
+
+$res = request('GET', '/urls.php?t=0123456789abcdef0123456789abcdef01234567', null, 'nocookie');
+check('an unknown share token returns 404', $res['status'] === 404, 'status=' . $res['status']);
+
+$res = request('GET', '/urls.php?t=' . $eventSlug, null, 'nocookie');
+check('the event slug alone does not open the list', $res['status'] === 404, 'status=' . $res['status']);
+
+// 作り直すと、古いリンクは開けなくなる
+$res = request('POST', '/admin/companies.php', [
+    'csrf_token' => csrf_from(request('GET', '/admin/companies.php?event=' . $eventId, null, 'org')['body']),
+    'action'     => 'reshare',
+    'event_id'   => (string) $eventId,
+], 'org');
+$newToken = event_share_token($eventId);
+check('the share link can be reissued', $newToken !== $shareToken, 'status=' . $res['status']);
+
+$res = request('GET', '/urls.php?t=' . $shareToken, null, 'nocookie');
+check('the old share link stops working', $res['status'] === 404, 'status=' . $res['status']);
+
+$res = request('GET', '/urls.php?t=' . $newToken, null, 'nocookie');
+check('the new share link works', $res['status'] === 200, 'status=' . $res['status']);
+
 $res = request('GET', '/admin/prizes.php', null, 'rcp');
 check('reception cannot register prizes either', $res['status'] === 404, 'status=' . $res['status']);
 
@@ -1367,6 +1402,24 @@ check('a sent invite keeps the address it was sent to',
 
 update_event($eventId, (string) $event['name'], (string) $event['start_date'],
     (string) $event['end_date'], 'closed');
+
+echo "=== last login ===\n";
+
+// ログインできた時刻を残し、アカウント管理画面に出す（当日までの準備の確認用）
+$loginRow = find_admin($organizerId);
+check('the login time is recorded', ($loginRow['last_login_at'] ?? null) !== null);
+
+$res = request('GET', '/admin/users.php', null, 'org');
+check('the account list has a last-login column', str_contains($res['body'], '最終ログイン'), 'status=' . $res['status']);
+check('the recorded time is shown',
+    str_contains($res['body'], e(format_datetime_ja((string) $loginRow['last_login_at']))));
+
+// まだ一度もログインしていないアカウントは、そうと分かるようにする
+$freshName = 'test_new_' . $stamp;
+$freshId   = create_admin_user($freshName, $password, 'TEST 未ログイン', 'reception', null);
+$res = request('GET', '/admin/users.php', null, 'org');
+check('an account that never logged in is marked', str_contains($res['body'], '未ログイン'));
+db()->prepare('DELETE FROM admin_users WHERE id = ?')->execute([$freshId]);
 
 echo "=== admin title ===\n";
 

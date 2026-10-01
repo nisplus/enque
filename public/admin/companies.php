@@ -21,7 +21,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     require_valid_csrf();
     $action = (string) (post_string('action') ?? '');
 
-    if ($action === 'create') {
+    if ($action === 'reshare') {
+        // 共有リンクが社外に出てしまったときなど。古いリンクは開けなくなる
+        regenerate_event_share_token($eventId);
+        flash_set('success', '共有リンクを作り直しました。古いリンクは開けなくなります。');
+    } elseif ($action === 'create') {
         $name  = trim_ja((string) (post_string('name') ?? ''));
         $booth = trim_ja((string) (post_string('booth_no') ?? ''));
         $color = trim_ja((string) (post_string('color') ?? ''));
@@ -115,35 +119,39 @@ echo '<a class="btn" href="qr_print.php?event=' . $eventId . '">QRコードを�
 echo '<a class="btn" href="index.php?event=' . $eventId . '">ダッシュボードへ</a>';
 echo '</div>';
 
-// Slack などに貼って動作確認するための一覧。QRを読まずにURLを共有できる
+// スタッフに共有するためのURL一覧。リンク1本で全社ぶんを開ける（ログイン不要のページ）
 if ($companies !== []) {
-    $lines = [];
+    $shareUrl = base_url() . '/urls.php?t=' . rawurlencode(event_share_token($eventId));
+    $lines    = [];
     foreach ($companies as $company) {
         $lines[] = (string) $company['name'] . "\n" . survey_url((string) $event['slug'], (string) $company['qr_slug']);
     }
 
     echo '<details class="card">';
-    echo '<summary>アンケートURLの一覧（Slackなどに貼る用）</summary>';
-    echo '<p class="muted">スタッフで動作確認するときは、QRコードを読み取らなくてもこのURLから開けます。</p>';
-    echo '<div class="alert alert-warn">イベントが<strong>「開催中」のときにこのURLを開くと、';
+    echo '<summary>アンケートURLをスタッフに共有する</summary>';
+    echo '<p class="muted">動作確認のときに、QRコードを読み取らなくてもアンケートを開けるようにする仕組みです。</p>';
+
+    echo '<p><strong>この1本をSlackなどに貼ってください</strong>（ログイン不要で、全社ぶんの一覧が開きます）。</p>';
+    echo '<p class="mono muted" style="word-break:break-all">';
+    echo '<a href="' . e($shareUrl) . '" target="_blank" rel="noopener">' . e($shareUrl) . '</a></p>';
+    echo '<form method="post" onsubmit="return confirm(\'いまのリンクは開けなくなります。よろしいですか？\');">' . csrf_field();
+    echo '<input type="hidden" name="action" value="reshare">';
+    echo '<input type="hidden" name="event_id" value="' . $eventId . '">';
+    echo '<div class="btn-row"><button type="submit" class="btn btn-small">共有リンクを作り直す</button></div>';
+    echo '</form>';
+    echo '<p class="muted">このリンクを知っている人は、ログインせずに各アンケートを開けます。';
+    echo '社外に出てしまったときは作り直してください（古いリンクは開けなくなります）。</p>';
+
+    echo '<div class="alert alert-warn">イベントが<strong>「開催中」のときにアンケートを開くと、';
     echo '回答しなくても「ユニーク来場者」が1人ぶん増えます</strong>。';
     echo '動作確認は<strong>「準備中」のうち</strong>に済ませるか、テスト用のイベントで行ってください';
     echo '（準備中なら「まだ公開されていません」と表示されるだけで、記録は残りません）。</div>';
+
+    echo '<p class="muted">URLをそのまま貼りたいときはこちら。</p>';
     echo '<textarea id="url-list" rows="6" readonly>' . e(implode("\n\n", $lines)) . '</textarea>';
     echo '<div class="btn-row"><button type="button" class="btn" id="url-copy">まとめてコピーする</button>';
     echo '<span class="muted" id="url-copied" hidden>コピーしました</span></div>';
     echo '</details>';
-
-    // クリップボードが使えない環境（HTTPS以外など）では、全選択だけして手動コピーに任せる
-    echo '<script>document.getElementById("url-copy").addEventListener("click", function () {'
-        . 'var box = document.getElementById("url-list"), done = document.getElementById("url-copied");'
-        . 'box.focus(); box.select();'
-        . 'var show = function () { done.hidden = false; window.setTimeout(function () { done.hidden = true; }, 3000); };'
-        . 'if (navigator.clipboard && window.isSecureContext) {'
-        . 'navigator.clipboard.writeText(box.value).then(show).catch(function () {});'
-        . 'return; }'
-        . 'try { if (document.execCommand("copy")) { show(); } } catch (e) {}'
-        . '});</script>';
 }
 
 echo '<div class="card"><h2 style="margin-top:0">企業を追加する</h2>';
@@ -233,4 +241,4 @@ if ($companies === []) {
     echo '<div class="card"><p class="muted">まだ企業が登録されていません。</p></div>';
 }
 
-page_footer();
+page_footer('/assets/copy.js');

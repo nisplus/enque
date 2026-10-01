@@ -64,6 +64,17 @@ function page_footer(string|array|null $scripts = null): void
     echo "</body>\n</html>\n";
 }
 
+/** イベントの状態の日本語表記 */
+function event_status_label(string $status): string
+{
+    return match ($status) {
+        'draft'  => '準備中',
+        'open'   => '開催中（回答受付）',
+        'closed' => '終了（総合アンケート送付）',
+        default  => $status,
+    };
+}
+
 /** 画面上部の通知 */
 function render_alert(?array $flash): void
 {

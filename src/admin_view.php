@@ -19,17 +19,6 @@ function role_label(string $role): string
     };
 }
 
-/** イベントの状態の日本語表記 */
-function event_status_label(string $status): string
-{
-    return match ($status) {
-        'draft'  => '準備中',
-        'open'   => '開催中（回答受付）',
-        'closed' => '終了（総合アンケート送付）',
-        default  => $status,
-    };
-}
-
 /**
  * 管理画面のヘッダー。ロールに応じてナビゲーションを出し分ける。
  */

@@ -315,6 +315,13 @@ details.card[open] > summary { margin-bottom: 8px; }
 }
 #scan-status { text-align: center; min-height: 1.7em; }
 
+/* スタッフ共有用のURL一覧 ---------------------------------------------------- */
+.url-list { list-style: none; margin: 0; padding: 0; }
+.url-list li { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.url-list li:last-child { border-bottom: 0; }
+.url-list .url-name { font-weight: 600; margin-bottom: 6px; }
+.url-list .btn { margin-bottom: 6px; }
+
 /* QR印刷 ------------------------------------------------------------------ */
 .qr-sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
 .qr-card {

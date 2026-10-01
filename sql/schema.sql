@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS events (
   status      ENUM('draft','open','closed') NOT NULL DEFAULT 'draft',
   -- 共通アンケート（type=overall）を何社目のブースから出すか（1 または 2）
   common_survey_from TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  -- ログイン不要で開けるURL一覧ページの合言葉（スタッフ共有用。作り直せる）
+  share_token CHAR(40) NULL UNIQUE,
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -196,6 +198,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
   role          ENUM('organizer','company','reception') NOT NULL,
   company_id    INT UNSIGNED NULL,
   is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  last_login_at DATETIME NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_admin_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

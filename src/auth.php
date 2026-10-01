@@ -238,6 +238,7 @@ function admin_authenticate(string $username, string $password, string $ip): ?ar
         update_admin_password((int) $user['id'], password_hash($password, PASSWORD_DEFAULT));
     }
     clear_login_failures($ip);
+    touch_admin_login((int) $user['id']);
 
     return $user;
 }

@@ -54,6 +54,7 @@ enque/
 │   ├── c.php                   交換コードQRの入口（/c/<コード>。受付は照会画面へ）
 │   ├── wallpaper.php           壁紙ダウンロード画面
 │   ├── wallpaper_file.php      壁紙の配信（回答済みトークンのみ）
+│   ├── urls.php                アンケートURLの一覧（スタッフ共有用・ログイン不要）
 │   ├── assets/                 style.css / app.js / scan.js（受付のQR読み取り）
 │   │   └── vendor/             jsqr.min.js（QRデコーダ, Apache-2.0）とライセンス全文
 │   └── admin/
@@ -219,6 +220,7 @@ mysql -u root -p enque -e "SHOW TABLES; SHOW COLUMNS FROM prize_claims;"
 | `sql/migrate_prizes.sql` | `prizes` テーブルの追加と、`prize_claims.prize_id`（渡した景品）の追加 | 景品機能より前に `sql/schema.sql` でDBを作った場合 |
 | `sql/migrate_party_size.sql` | 設問の種類に「数値入力」を追加し、`questions.metric`（来場人数として集計するか）を追加 | 来場人数の集計より前に `sql/schema.sql` でDBを作った場合 |
 | `sql/migrate_common_survey.sql` | `events.common_survey_from`（総合アンケートを何社目のブースから出すか）を追加 | 総合アンケートを会期中に集める版より前に `sql/schema.sql` でDBを作った場合 |
+| `sql/migrate_share_and_login.sql` | `events.share_token`（URL一覧の共有リンク）と `admin_users.last_login_at`（最終ログイン）を追加 | URL一覧の共有・最終ログイン表示より前に `sql/schema.sql` でDBを作った場合 |
 
 - **新規に構築する場合は `sql/schema.sql` だけで足ります**（マイグレーションは不要です）。
 - マイグレーションは `IF NOT EXISTS` で書いてあるので、**二度流しても壊れません**。
@@ -414,7 +416,7 @@ C:\xampp\php\php.exe bin\seed_traffic.php --force --visitors=200
 ```
 C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（80項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（296項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（312項目）
 node tests\scan_test.js                                   REM QR読み取り判定（27項目・Nodeがある場合のみ）
 ```
 
@@ -520,6 +522,12 @@ PHPの組み込みサーバーは逐次処理のため、**必ず Apache + php-f
   （`public/assets/scan.js` と同梱の jsQR）を `data-scan-mode="booth"` で使い回し、**同じオリジンの
   `/s/<イベント>/<企業>` 形式のURLだったときだけ**同じタブで移動します。カメラが使えない端末・HTTPS以外
   ではボタンを出さず、カメラアプリで読み取る案内に落とします。
+- **スタッフ共有用のURL一覧は、ログイン不要の専用ページです（`/urls.php?t=<合言葉>`）。** 運用テストのとき、
+  スマホに出したQRを同じスマホで読み取るのは難しく、長いURLを並べてSlackに貼るのも手間なためです。
+  合言葉は**イベントのスラグとは別の乱数**にしてあり、ブースのQRから全社ぶんを辿れないようにしています。
+  漏れたときは管理画面から作り直せます（古いリンクは404になります）。検索避けに `noindex` を付けています。
+  なお**開催中にアンケートを開くと、回答しなくてもユニーク来場者が1増えます**。画面とマニュアルで、
+  動作確認は「準備中」のうちに行うよう案内しています。
 - **総合受付には「交換コードを表示する」QRを1枚掲示します。** タブを閉じた来場者がブースを回り直さずに
   交換コードを出せるようにするためで、`/done.php?e=<イベント>&from=desk` を印刷します（`qr_print.php?desk=1`）。
   来場者ごとのQRではなく、端末のCookieで本人を判別するので1枚で全員に使えます。見つからないときは
