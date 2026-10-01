@@ -324,6 +324,18 @@ check('done page suggests a screenshot or bookmark',
     str_contains($res['body'], 'スクリーンショット') && str_contains($res['body'], 'ブックマーク'));
 check('claim code is not re-issued on reload', str_contains(done_page()['body'], $claimCode));
 
+// 次のブースは、この画面のままカメラで読み取れる（カメラアプリに出てタブが増えないように）
+check('the done page offers an in-page scanner',
+    str_contains($res['body'], 'data-scan-mode="booth"') && str_contains($res['body'], '/assets/scan.js'));
+check('the done page asks visitors to keep the tab open',
+    str_contains($res['body'], '閉じずに残しておいてください'));
+
+// 総合受付の掲示から来た人には、見つからない理由を案内する
+$res = request('GET', '/done.php?e=' . $eventSlug . '&from=desk', null, 'nocookie');
+check('the reception poster explains an empty result',
+    str_contains($res['body'], '交換コードが見つかりません')
+    && str_contains($res['body'], 'スタッフにお声がけください'), 'status=' . $res['status']);
+
 // Cookie が無い端末でも、コード付きURLなら同じ画面に戻れる
 $codeUrl = '/done.php?e=' . $eventSlug . '&c=' . rawurlencode($claimCode);
 $res = request('GET', $codeUrl, null, 'nocookie');
@@ -610,6 +622,17 @@ check('qr endpoint returns svg', str_contains($res['headers'], 'image/svg+xml') 
 $res = request('GET', '/admin/qr_print.php?event=' . $eventId, null, 'org');
 check('qr print sheet lists the companies', str_contains($res['body'], 'TEST CO A') && str_contains($res['body'], 'TEST CO B'));
 check('qr print sheet embeds the survey url', str_contains($res['body'], (string) $companyA['qr_slug']));
+check('the organizer is offered the reception poster', str_contains($res['body'], 'desk=1'));
+
+// 総合受付に掲示する「交換コードを表示する」QR
+$res = request('GET', '/admin/qr_print.php?event=' . $eventId . '&desk=1', null, 'org');
+check('the reception poster prints', $res['status'] === 200 && str_contains($res['body'], '交換コードを表示する'),
+    'status=' . $res['status']);
+check('the poster carries the lookup url', str_contains($res['body'], e(claim_display_url($eventSlug))));
+check('the poster tells visitors to ask the staff', str_contains($res['body'], 'スタッフにお声がけください'));
+
+$res = request('GET', '/admin/qr_print.php?event=' . $eventId . '&desk=1', null, 'co');
+check('a company user cannot print the reception poster', $res['status'] === 404, 'status=' . $res['status']);
 
 echo "=== survey editor ===\n";
 

@@ -324,12 +324,17 @@ details.card[open] > summary { margin-bottom: 8px; }
 .qr-card svg { width: 100%; max-width: 200px; height: auto; }
 .qr-card .qr-name { font-weight: 700; margin-top: 8px; }
 .qr-card .qr-url { font-size: .7rem; color: #555; word-break: break-all; }
+/* 総合受付の掲示は1枚だけなので大きく出す */
+.qr-sheet-single { grid-template-columns: 1fr; max-width: 520px; margin: 0 auto; }
+.qr-sheet-single .qr-card svg { max-width: 380px; }
+.qr-sheet-single .qr-card .qr-name { font-size: 1.4rem; }
 
 @media print {
   .site-header, .no-print, .btn { display: none !important; }
   body { background: #fff; color: #000; }
   .wrap { max-width: none; padding: 0; }
   .qr-sheet { grid-template-columns: repeat(2, 1fr); }
+  .qr-sheet-single { grid-template-columns: 1fr; max-width: none; }
   .card { box-shadow: none; border-color: #ccc; break-inside: avoid; }
 }
 

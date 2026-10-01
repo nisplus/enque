@@ -1,8 +1,14 @@
-/* 景品交換の照会画面：スマホのカメラで交換コードのQRを読み取る
+/* スマホのカメラでQRコードを読み取る（2つの画面で使う）
+ *
+ *   claim … 受付の照会画面。来場者の交換コードを読み取って照会画面を開く
+ *   booth … 来場者の回答済み画面。次のブースのQRを読み取り、同じタブで移動する
+ *           （カメラアプリを使わずに済むので、タブが増え続けない）
+ *
+ * どちらで動くかは、ボタン（#scan-open）の data-scan-mode で決める（既定は claim）。
  *
  * ・端末のブラウザに Barcode Detection API があればそれを使う（Android Chrome など）
  * ・無ければ同梱の jsQR で解析する（iOS Safari はこちら）
- * ・カメラが使えない端末ではボタンを出さず、交換コードの手入力に任せる
+ * ・カメラが使えない端末ではボタンを出さず、手入力やカメラアプリに任せる
  *
  * カメラの利用には HTTPS（secure context）が必要。
  */
@@ -39,8 +45,45 @@
     return code.slice(0, 4) + '-' + code.slice(4);
   }
 
+  /**
+   * 読み取った文字列が、このサイトのブースアンケートのURLなら、そのURLを返す。
+   *
+   * 別のサイトのQRコードを読んでも移動しないよう、同じオリジンで、かつ
+   * /s/<イベント>/<企業> か /s.php?e=…&c=… の形のものだけを受け付ける。
+   * （origin はテストから渡せるようにしてあり、画面では現在のページのものを使う）
+   */
+  function extractBoothUrl(text, origin) {
+    if (!text) {
+      return null;
+    }
+    var base = origin || (window.location ? window.location.origin : '');
+    if (!base) {
+      return null;
+    }
+
+    var url;
+    try {
+      url = new URL(String(text).trim(), base);
+    } catch (e) {
+      return null;
+    }
+
+    if (url.origin !== base) {
+      return null;
+    }
+    if (/^\/s\/[^/]+\/[^/]+\/?$/.test(url.pathname)) {
+      return url.href;
+    }
+    if (url.pathname === '/s.php' && url.searchParams.get('e') && url.searchParams.get('c')) {
+      return url.href;
+    }
+
+    return null;
+  }
+
   if (typeof window !== 'undefined') {
     window.enqueExtractClaimCode = extractCode;
+    window.enqueExtractBoothUrl  = extractBoothUrl;
   }
   if (typeof document === 'undefined') {
     return; // テストから読み込まれた場合はここまで
@@ -58,15 +101,22 @@
     return;
   }
 
+  // 回答済み画面（booth）と受付の照会画面（claim）で、読み取る対象と移動先が変わる
+  var booth     = openBtn.getAttribute('data-scan-mode') === 'booth';
   var hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
   var secure    = window.isSecureContext !== false;
 
   if (!hasCamera || !secure) {
-    // 読み取りが使えない端末では、手入力だけを見せる
+    // 読み取りが使えない端末では、手入力やカメラアプリに任せる
     if (unsupport) {
-      unsupport.textContent = !secure
-        ? 'このページはHTTPSで開いたときだけカメラを使えます。交換コードを手入力してください。'
-        : 'このブラウザではカメラでの読み取りができません。交換コードを手入力してください。';
+      if (booth) {
+        unsupport.textContent = 'この画面からはカメラを使えませんでした。'
+          + 'お手数ですが、スマートフォンのカメラアプリでブースのQRコードを読み取ってください。';
+      } else {
+        unsupport.textContent = !secure
+          ? 'このページはHTTPSで開いたときだけカメラを使えます。交換コードを手入力してください。'
+          : 'このブラウザではカメラでの読み取りができません。交換コードを手入力してください。';
+      }
       unsupport.hidden = false;
     }
     return;
@@ -101,13 +151,25 @@
     openBtn.hidden = false;
   }
 
-  function found(code) {
+  /** QRは読めたが、この画面で使えるものではなかったときの案内 */
+  function mismatch() {
+    return booth
+      ? 'このイベントのブースのQRコードではないようです。もう一度かざしてください。'
+      : '交換コードのQRコードではないようです。もう一度かざしてください。';
+  }
+
+  /** 読み取った文字列から、この画面で使える値（交換コード／ブースのURL）を取り出す */
+  function read(text) {
+    return booth ? extractBoothUrl(text) : extractCode(text);
+  }
+
+  function found(value) {
     stop();
-    setStatus('読み取りました：' + code);
+    setStatus(booth ? '読み取りました。ブースのアンケートを開きます…' : '読み取りました：' + value);
     if (navigator.vibrate) {
       navigator.vibrate(60);
     }
-    window.location.href = 'claim.php?code=' + encodeURIComponent(code);
+    window.location.href = booth ? value : 'claim.php?code=' + encodeURIComponent(value);
   }
 
   /** 1フレーム解析する。約10回/秒に抑えて電池と発熱を抑える */
@@ -130,13 +192,13 @@
 
     if (detector) {
       detector.detect(canvas).then(function (results) {
-        var code = results && results.length ? extractCode(results[0].rawValue) : null;
+        var code = results && results.length ? read(results[0].rawValue) : null;
         if (code) {
           found(code);
           return;
         }
         if (results && results.length) {
-          setStatus('交換コードのQRコードではないようです。もう一度かざしてください。');
+          setStatus(mismatch());
         }
         timer = window.setTimeout(tick, 100);
       }).catch(function () {
@@ -150,13 +212,13 @@
     if (window.jsQR) {
       var image  = context.getImageData(0, 0, width, height);
       var result = window.jsQR(image.data, width, height, { inversionAttempts: 'dontInvert' });
-      var code   = result ? extractCode(result.data) : null;
+      var code   = result ? read(result.data) : null;
       if (code) {
         found(code);
         return;
       }
       if (result) {
-        setStatus('交換コードのQRコードではないようです。もう一度かざしてください。');
+        setStatus(mismatch());
       }
     }
 
@@ -179,7 +241,9 @@
       return video.play();
     }).then(function () {
       scanning = true;
-      setStatus('来場者の画面のQRコードを枠に入れてください。');
+      setStatus(booth
+        ? 'ブースに掲示されたQRコードを枠に入れてください。'
+        : '来場者の画面のQRコードを枠に入れてください。');
 
       // 内蔵APIがあれば優先（速く、電池にもやさしい）
       if (window.BarcodeDetector) {
@@ -198,9 +262,13 @@
       if (name === 'NotAllowedError' || name === 'SecurityError') {
         setStatus('カメラの使用が許可されていません。ブラウザの設定でこのサイトのカメラを許可してください。');
       } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-        setStatus('使えるカメラが見つかりませんでした。交換コードを手入力してください。');
+        setStatus(booth
+          ? '使えるカメラが見つかりませんでした。カメラアプリでQRコードを読み取ってください。'
+          : '使えるカメラが見つかりませんでした。交換コードを手入力してください。');
       } else {
-        setStatus('カメラを起動できませんでした。交換コードを手入力してください。');
+        setStatus(booth
+          ? 'カメラを起動できませんでした。カメラアプリでQRコードを読み取ってください。'
+          : 'カメラを起動できませんでした。交換コードを手入力してください。');
       }
       if (statusEl) {
         statusEl.hidden = false;
@@ -218,7 +286,7 @@
   document.addEventListener('visibilitychange', function () {
     if (document.hidden && scanning) {
       stop();
-      setStatus('カメラを止めました。もう一度「QRコードを読み取る」を押してください。');
+      setStatus('カメラを止めました。もう一度ボタンを押してください。');
       panel.hidden = false;
     }
   });

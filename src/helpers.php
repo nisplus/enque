@@ -214,6 +214,17 @@ function wallpaper_url(string $token): string
 }
 
 /**
+ * 交換コードを呼び出すURL（総合受付に掲示するQRコード用）。
+ *
+ * 来場者が自分の端末で読み取ると、その端末のCookieから本人の回答済み画面が開く。
+ * 来場者ごとにQRを作る必要はなく、1枚の掲示を全員で使える。
+ */
+function claim_display_url(string $eventSlug): string
+{
+    return base_url() . '/done.php?e=' . rawurlencode($eventSlug) . '&from=desk';
+}
+
+/**
  * 交換コードのURL（回答済み画面のQRコードに入れる）。
  *
  * 総合受付のスタッフがスマホで読み取ると交換の照会画面が開き、

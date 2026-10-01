@@ -49,6 +49,24 @@ check('look-alike characters are rejected', extract('ABCD-2O45') === null);
 check('a too short code is rejected', extract('ABCD-234') === null);
 check('empty input is rejected', extract('') === null && extract(null) === null);
 
+// ------------------------------------------------- ブースURLの取り出し（来場者の画面）
+
+const booth  = global.window.enqueExtractBoothUrl;
+const origin = 'https://survey.example.jp';
+
+check('scan.js exposes the booth url reader', typeof booth === 'function');
+check('a booth url is accepted',
+  booth('https://survey.example.jp/s/ev1/co1', origin) === 'https://survey.example.jp/s/ev1/co1');
+check('the query string form is accepted',
+  booth('https://survey.example.jp/s.php?e=ev1&c=co1', origin) === 'https://survey.example.jp/s.php?e=ev1&c=co1');
+check('a trailing slash is accepted', booth('https://survey.example.jp/s/ev1/co1/', origin) !== null);
+check('another site is rejected', booth('https://evil.example.com/s/ev1/co1', origin) === null);
+check('another page on the same site is rejected', booth('https://survey.example.jp/admin/login.php', origin) === null);
+check('a claim code url is rejected', booth('https://survey.example.jp/c/ABCD-2345', origin) === null);
+check('the query form without a company is rejected', booth('https://survey.example.jp/s.php?e=ev1', origin) === null);
+check('plain text is rejected', booth('ABCD-2345', origin) === null);
+check('empty input is rejected', booth('', origin) === null && booth(null, origin) === null);
+
 // ---------------------------------------------------------------- jsQR との組み合わせ
 
 const jsqrPath = path.join(root, 'public/assets/vendor/jsqr.min.js');

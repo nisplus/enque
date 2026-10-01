@@ -36,7 +36,39 @@ if ($companyId > 0) {
     $companies = companies_for_event((int) $event['id']);
 }
 
+// 総合受付に掲示する「交換コードを表示する」QR（来場者が自分の端末で読み取る）
+$desk = (get_string('desk') ?? '') === '1';
+
 admin_page_header($user, 'QRコード印刷', 'companies.php');
+
+if ($desk) {
+    require_organizer();
+    $deskUrl = claim_display_url((string) $event['slug']);
+
+    echo '<h1 class="no-print">総合受付の掲示（交換コードの呼び出し）</h1>';
+    echo '<p class="no-print muted">来場者がこのQRコードを自分のスマートフォンで読み取ると、';
+    echo '<strong>その方の交換コードの画面</strong>が開きます。ブラウザを閉じてしまった方の案内に使えます。';
+    echo '来場者ごとのQRコードではないので、1枚を掲示すれば全員に使えます。</p>';
+    echo '<div class="btn-row no-print">';
+    echo '<button type="button" class="btn btn-primary" onclick="window.print()">印刷する</button>';
+    echo '<a class="btn" href="qr_print.php?event=' . (int) $event['id'] . '">ブースのQRへ</a>';
+    echo '</div>';
+
+    echo '<div class="qr-sheet qr-sheet-single">';
+    echo '<div class="qr-card">';
+    echo '<div class="qr-name">交換コードを表示する</div>';
+    echo '<div class="muted">' . e((string) $event['name']) . '</div>';
+    echo qr_svg($deskUrl, 7, 2);
+    echo '<div style="font-weight:600">アンケートに回答された方へ</div>';
+    echo '<div class="muted">ご自分のスマートフォンで読み取ると、交換コードが表示されます。<br>';
+    echo '表示されない場合は、スタッフにお声がけください。</div>';
+    echo '<div class="qr-url">' . e($deskUrl) . '</div>';
+    echo '</div>';
+    echo '</div>';
+
+    page_footer();
+    exit;
+}
 
 echo '<h1 class="no-print">QRコードの印刷</h1>';
 echo '<p class="no-print muted">ブラウザの印刷機能で「PDFとして保存」を選ぶとPDFになります。';
@@ -44,6 +76,9 @@ echo 'A4縦・余白は既定のままで、1ページに4枚並びます。</p>
 echo '<div class="btn-row no-print">';
 echo '<button type="button" class="btn btn-primary" onclick="window.print()">印刷する</button>';
 echo '<a class="btn" href="companies.php?event=' . (int) $event['id'] . '">企業一覧へ戻る</a>';
+if ((string) $user['role'] === 'organizer') {
+    echo '<a class="btn" href="qr_print.php?event=' . (int) $event['id'] . '&desk=1">総合受付の掲示を印刷する</a>';
+}
 echo '</div>';
 
 echo '<div class="qr-sheet">';
