@@ -513,6 +513,17 @@ request('POST', '/admin/login.php', ['csrf_token' => $token, 'username' => $rece
 $res = request('GET', '/admin/companies.php', null, 'rcp');
 check('reception cannot open company management', $res['status'] === 404);
 
+// 動作確認用に、アンケートURLをリンクで開けて、まとめてコピーもできる
+$res = request('GET', '/admin/companies.php?event=' . $eventId, null, 'org');
+$surveyLink = survey_url($eventSlug, (string) $companyA['qr_slug']);
+check('the company list links to the survey url',
+    str_contains($res['body'], '<a href="' . e($surveyLink) . '" target="_blank" rel="noopener">'),
+    'status=' . $res['status']);
+check('the list of urls can be copied in one go',
+    str_contains($res['body'], 'id="url-list"') && str_contains($res['body'], $surveyLink));
+check('the list warns that opening the url counts as a visitor',
+    str_contains($res['body'], 'ユニーク来場者'));
+
 $res = request('GET', '/admin/prizes.php', null, 'rcp');
 check('reception cannot register prizes either', $res['status'] === 404, 'status=' . $res['status']);
 

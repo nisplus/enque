@@ -115,6 +115,37 @@ echo '<a class="btn" href="qr_print.php?event=' . $eventId . '">QRコードを�
 echo '<a class="btn" href="index.php?event=' . $eventId . '">ダッシュボードへ</a>';
 echo '</div>';
 
+// Slack などに貼って動作確認するための一覧。QRを読まずにURLを共有できる
+if ($companies !== []) {
+    $lines = [];
+    foreach ($companies as $company) {
+        $lines[] = (string) $company['name'] . "\n" . survey_url((string) $event['slug'], (string) $company['qr_slug']);
+    }
+
+    echo '<details class="card">';
+    echo '<summary>アンケートURLの一覧（Slackなどに貼る用）</summary>';
+    echo '<p class="muted">スタッフで動作確認するときは、QRコードを読み取らなくてもこのURLから開けます。</p>';
+    echo '<div class="alert alert-warn">イベントが<strong>「開催中」のときにこのURLを開くと、';
+    echo '回答しなくても「ユニーク来場者」が1人ぶん増えます</strong>。';
+    echo '動作確認は<strong>「準備中」のうち</strong>に済ませるか、テスト用のイベントで行ってください';
+    echo '（準備中なら「まだ公開されていません」と表示されるだけで、記録は残りません）。</div>';
+    echo '<textarea id="url-list" rows="6" readonly>' . e(implode("\n\n", $lines)) . '</textarea>';
+    echo '<div class="btn-row"><button type="button" class="btn" id="url-copy">まとめてコピーする</button>';
+    echo '<span class="muted" id="url-copied" hidden>コピーしました</span></div>';
+    echo '</details>';
+
+    // クリップボードが使えない環境（HTTPS以外など）では、全選択だけして手動コピーに任せる
+    echo '<script>document.getElementById("url-copy").addEventListener("click", function () {'
+        . 'var box = document.getElementById("url-list"), done = document.getElementById("url-copied");'
+        . 'box.focus(); box.select();'
+        . 'var show = function () { done.hidden = false; window.setTimeout(function () { done.hidden = true; }, 3000); };'
+        . 'if (navigator.clipboard && window.isSecureContext) {'
+        . 'navigator.clipboard.writeText(box.value).then(show).catch(function () {});'
+        . 'return; }'
+        . 'try { if (document.execCommand("copy")) { show(); } } catch (e) {}'
+        . '});</script>';
+}
+
 echo '<div class="card"><h2 style="margin-top:0">企業を追加する</h2>';
 echo '<form method="post">' . csrf_field();
 echo '<input type="hidden" name="action" value="create">';
@@ -150,7 +181,9 @@ foreach ($companies as $company) {
     }
     echo '</h3><span class="muted">回答 ' . count_label($responses) . '</span></div>';
 
-    echo '<p class="mono muted" style="word-break:break-all">' . e($url) . '</p>';
+    // 動作確認でそのまま開けるようにリンクにする（別タブで開き、管理画面は残す）
+    echo '<p class="mono muted" style="word-break:break-all">';
+    echo '<a href="' . e($url) . '" target="_blank" rel="noopener">' . e($url) . '</a></p>';
 
     echo '<div class="btn-row">';
     if ($survey !== null) {
