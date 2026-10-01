@@ -177,6 +177,11 @@ check('a value above the configured maximum is rejected',
     validate_answer($party, (string) (party_size_max() + 1))['ok'] === false);
 check('the configured maximum itself is accepted',
     validate_answer($party, (string) party_size_max())['value'] === (string) party_size_max());
+// 来場者に見せる呼び名と文面は .env で差し替えられる
+check('the booth label has a value', booth_label() !== '');
+check('the email note falls back to a sentence with the wallpaper label',
+    config()['email_note'] !== '' || str_contains(email_note(), wallpaper_label()));
+
 $nps = ['id' => 6, 'type' => 'nps', 'label' => 'Q', 'options' => null, 'required' => 0];
 check('nps accepts 0', validate_answer($nps, '0')['value'] === '0');
 check('nps accepts 10', validate_answer($nps, '10')['value'] === '10');

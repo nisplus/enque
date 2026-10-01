@@ -324,11 +324,20 @@ check('done page suggests a screenshot or bookmark',
     str_contains($res['body'], 'スクリーンショット') && str_contains($res['body'], 'ブックマーク'));
 check('claim code is not re-issued on reload', str_contains(done_page()['body'], $claimCode));
 
-// 次のブースは、この画面のままカメラで読み取れる（カメラアプリに出てタブが増えないように）
+// 次の企業（ブース）は、この画面のままカメラで読み取れる（タブが増えないように）
 check('the done page offers an in-page scanner',
     str_contains($res['body'], 'data-scan-mode="booth"') && str_contains($res['body'], '/assets/scan.js'));
-check('the done page asks visitors to keep the tab open',
-    str_contains($res['body'], '閉じずに残しておいてください'));
+check('the scanner button uses the configured label',
+    str_contains($res['body'], '次の' . booth_label() . 'のQRコードを読み取る'));
+check('the done page reassures visitors who close the tab',
+    str_contains($res['body'], 'もし閉じてしまっても大丈夫です'));
+
+// 次に進む導線は、メールアドレス欄より前に置く
+$posScan  = strpos($res['body'], 'id="scan-open"');
+$posEmail = strpos($res['body'], 'name="email"');
+check('the scanner comes before the email field',
+    $posScan !== false && $posEmail !== false && $posScan < $posEmail,
+    'scan=' . var_export($posScan, true) . ' email=' . var_export($posEmail, true));
 
 // 総合受付の掲示から来た人には、見つからない理由を案内する
 $res = request('GET', '/done.php?e=' . $eventSlug . '&from=desk', null, 'nocookie');

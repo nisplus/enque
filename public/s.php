@@ -38,11 +38,11 @@ if (!$available) {
     render_company_badge($company);
     echo '<h1>' . e((string) ($survey['title'] ?? 'アンケート')) . '</h1>';
     if ($status === 'closed') {
-        echo '<div class="alert alert-info">このイベントのブースアンケートは受付を終了しました。ご協力ありがとうございました。</div>';
+        echo '<div class="alert alert-info">このイベントの' . e(booth_label()) . 'アンケートは受付を終了しました。ご協力ありがとうございました。</div>';
     } elseif ($status === 'draft') {
         echo '<div class="alert alert-info">このアンケートはまだ公開されていません。</div>';
     } else {
-        echo '<div class="alert alert-info">このアンケートは現在受け付けていません。ブースの担当者にお知らせください。</div>';
+        echo '<div class="alert alert-info">このアンケートは現在受け付けていません。' . e(booth_label()) . 'の担当者にお知らせください。</div>';
     }
     page_footer();
     exit;

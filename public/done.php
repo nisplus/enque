@@ -44,7 +44,7 @@ if ($codeParam !== '') {
         page_header('交換コードが見つかりません｜' . (string) $event['name'], ['brand' => (string) $event['name']]);
         echo '<h1>交換コードが見つかりません</h1>';
         echo '<div class="alert alert-warn">URLの交換コードが正しくないようです。';
-        echo 'ブースのQRコードを読み取ってアンケートにご回答いただくと、新しい交換コードが表示されます。</div>';
+        echo e(booth_label()) . 'のQRコードを読み取ってアンケートにご回答いただくと、新しい交換コードが表示されます。</div>';
         echo '<p class="muted">お困りのときは総合受付のスタッフにお声がけください。</p>';
         page_footer();
         exit;
@@ -63,7 +63,7 @@ if ($visitor === null) {
             echo '<div class="alert alert-warn">この端末からのご回答が確認できませんでした。';
             echo '<strong>回答したときと同じスマートフォン・同じブラウザ</strong>で読み取ってください。';
             echo 'それでも表示されないときは、総合受付のスタッフにお声がけください。</div>';
-            echo '<p>まだご回答でない方は、ブースのQRコードを読み取ってアンケートにご回答ください。</p>';
+            echo '<p>まだご回答でない方は、' . e(booth_label()) . 'のQRコードを読み取ってアンケートにご回答ください。</p>';
         } else {
             echo '<h1>ご回答ありがとうございました</h1>';
             echo '<div class="alert alert-warn">ブラウザの設定でCookieが無効になっているため、交換コードを表示できません。';
@@ -81,7 +81,7 @@ $visited = visited_companies((int) $visitor['id']);
 if ($visited === []) {
     page_header('回答状況｜' . (string) $event['name'], ['brand' => (string) $event['name']]);
     echo '<h1>まだ回答がありません</h1>';
-    echo '<p>ブースのQRコードを読み取って、アンケートにご回答ください。</p>';
+    echo '<p>' . e(booth_label()) . 'のQRコードを読み取って、アンケートにご回答ください。</p>';
     if ((get_string('from') ?? '') === 'desk') {
         // 総合受付の掲示から来た人向け。回答済みのはずなのに出ない場合がある
         echo '<div class="alert alert-warn">すでにご回答いただいている場合は、';
@@ -134,7 +134,7 @@ echo '</div>';
 
 echo '<div class="alert alert-info">' . same_device_note() . '</div>';
 
-echo '<h2>回答済みのブース（' . count($visited) . '社）</h2>';
+echo '<h2>回答済みの' . e(booth_label()) . '（' . count($visited) . '社）</h2>';
 echo '<ul class="visited-list">';
 foreach ($visited as $row) {
     echo '<li><span>' . e((string) $row['name']) . '</span>';
@@ -160,7 +160,7 @@ if ($overall !== null && (int) $overall['is_published'] === 1 && questions_for_s
             echo $overallOpen ? '内容はお帰りまで何度でも直せます。</p>' : '</p>';
         } else {
             echo '<p>イベント全体についてお聞かせください。<strong>お帰りの際で結構です。</strong>';
-            echo 'ブースのアンケート画面からでも、この画面からでもご回答いただけます。</p>';
+            echo e(booth_label()) . 'のアンケート画面からでも、この画面からでもご回答いただけます。</p>';
         }
         if ($overallOpen) {
             echo '<div class="btn-row"><a class="btn' . ($overallAnswered ? '' : ' btn-primary')
@@ -170,6 +170,27 @@ if ($overall !== null && (int) $overall['is_published'] === 1 && questions_for_s
         echo '</div>';
     }
 }
+
+// 次に向かうための導線は、メールアドレス欄より前に置く（回答の直後に使うのはこちらのため）
+echo '<h2>ほかの' . e(booth_label()) . 'もまわる</h2>';
+echo '<div class="card">';
+echo '<p class="text-secondary">下のボタンを押すと、この画面のままカメラでQRコードを読み取れます。';
+echo 'ブラウザを閉じる必要はありません。</p>';
+// カメラが使える端末でだけボタンを出す（判定は scan.js が行う）
+echo '<div class="btn-row"><button type="button" class="btn btn-primary btn-block" id="scan-open"'
+    . ' data-scan-mode="booth" hidden>次の' . e(booth_label()) . 'のQRコードを読み取る</button></div>';
+echo '<p class="muted" id="scan-unsupported" hidden></p>';
+echo '<div id="scan-panel" hidden>';
+echo '<div class="scan-view"><video id="scan-video" playsinline muted></video><span class="scan-frame"></span></div>';
+echo '<canvas id="scan-canvas" hidden></canvas>';
+echo '<p class="muted" id="scan-status">カメラを起動しています…</p>';
+echo '<div class="btn-row"><button type="button" class="btn btn-block" id="scan-close">閉じる</button></div>';
+echo '</div>';
+echo '<p class="muted">この画面はそのまま開いておくと便利です。';
+echo '<strong>もし閉じてしまっても大丈夫です。</strong>総合受付に掲示されているQRコードを読み取るか、';
+echo '次のURLを開けば、同じ交換コードをいつでも表示できます。</p>';
+echo '<p class="mono muted" style="word-break:break-all">' . e($pageUrl) . '</p>';
+echo '</div>';
 
 if ($saved) {
     // 自分で入力した直後の1回だけは、そのまま出して確認してもらう
@@ -183,7 +204,7 @@ if ($error !== null) {
 if (($visitor['email'] ?? null) === null) {
     echo '<div class="card">';
     echo '<h2 style="margin-top:0">スマホ壁紙をご希望の方へ</h2>';
-    echo '<p>イベント終了後に、' . e(wallpaper_label()) . 'のダウンロード案内をお送りします。</p>';
+    echo '<p>' . e(email_note()) . '</p>';
     echo '<form method="post">';
     // コード付きで開いている場合も、送信先を同じ来場者に保つ
     echo '<input type="hidden" name="c" value="' . e($code) . '">';
@@ -213,24 +234,5 @@ if (($visitor['email'] ?? null) === null) {
 
 // スタッフがログインしていない状態でQRを読み取った場合の逃げ道
 echo '<p class="muted">スタッフの方はこちら：<a href="/admin/claim.php?code=' . rawurlencode($code) . '">交換の照会画面</a></p>';
-
-echo '<h2>ほかのブースもまわる</h2>';
-echo '<div class="card">';
-echo '<p class="text-secondary">下のボタンを押すと、この画面のままカメラでQRコードを読み取れます。';
-echo 'ブラウザを閉じる必要はありません。</p>';
-// カメラが使える端末でだけボタンを出す（判定は scan.js が行う）
-echo '<div class="btn-row"><button type="button" class="btn btn-primary btn-block" id="scan-open"'
-    . ' data-scan-mode="booth" hidden>次のブースのQRコードを読み取る</button></div>';
-echo '<p class="muted" id="scan-unsupported" hidden></p>';
-echo '<div id="scan-panel" hidden>';
-echo '<div class="scan-view"><video id="scan-video" playsinline muted></video><span class="scan-frame"></span></div>';
-echo '<canvas id="scan-canvas" hidden></canvas>';
-echo '<p class="muted" id="scan-status">カメラを起動しています…</p>';
-echo '<div class="btn-row"><button type="button" class="btn btn-block" id="scan-close">閉じる</button></div>';
-echo '</div>';
-echo '<p class="muted">この画面は<strong>閉じずに残しておいてください</strong>。';
-echo '閉じてしまった場合は、総合受付に掲示されているQRコードを読み取るか、次のURLを開いてください。</p>';
-echo '<p class="mono muted" style="word-break:break-all">' . e($pageUrl) . '</p>';
-echo '</div>';
 
 page_footer(['/assets/vendor/jsqr.min.js', '/assets/scan.js']);

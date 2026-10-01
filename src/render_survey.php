@@ -81,7 +81,7 @@ function render_survey_page(array $view): void
         echo '<div class="common-block">';
         echo '<h2>' . e(overall_label()) . '<span class="badge badge-optional">イベント全体について</span></h2>';
         echo '<p class="text-secondary"><strong>最後にお帰りの際にご記入ください。</strong>';
-        echo 'ここは空欄のままで送信していただいて構いません（次のブースの画面にも出ます）。';
+        echo 'ここは空欄のままで送信していただいて構いません（次の' . e(booth_label()) . 'の画面にも出ます）。';
         echo 'ご記入後に内容を変えることもできます。</p>';
         foreach ($common['questions'] as $question) {
             render_question($question, $view['previous'], in_array((int) $question['id'], $view['invalid'], true));
@@ -99,8 +99,8 @@ function render_survey_page(array $view): void
             echo '<span class="hint">登録済みのアドレスです。<strong>間違いがあれば書き換えて送信してください。</strong>';
             echo 'このまま送信しても、空欄にして送信しても、登録内容は変わりません。</span></label>';
         } else {
-            echo '<span class="hint">イベント終了後に' . e(wallpaper_label()) . 'のダウンロード案内をお送りします。';
-            echo '入力は任意で、他の個人情報はお伺いしません。</span></label>';
+            // 文面は .env の EMAIL_NOTE で差し替えられる
+            echo '<span class="hint">' . e(email_note()) . '</span></label>';
         }
         echo '<input type="email" id="email" name="email" autocomplete="email" inputmode="email" '
             . 'value="' . e($view['email_value']) . '" placeholder="example@example.jp">';

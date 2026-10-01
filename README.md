@@ -172,7 +172,20 @@ WALLPAPER_LABEL=◯◯フェアオリジナル壁紙
 
 # 来場人数（「何人で来られましたか」）の選択肢の上限（既定は10）
 PARTY_SIZE_MAX=10
+
+# 来場者の画面での「出展のひとつ」の呼び方（既定は「ブース」）
+# 合同説明会など「企業」と呼ぶイベントでは BOOTH_LABEL=企業 にする
+BOOTH_LABEL=企業
+
+# メールアドレス欄の説明文（空ならシステムの既定文）
+EMAIL_NOTE=イベント終了後に壁紙のご案内をお送りします。入力は任意です。
 ```
+
+`BOOTH_LABEL` は来場者に見える画面だけに効きます（「次の◯◯のQRコードを読み取る」「回答済みの◯◯」など）。
+管理画面とマニュアルの表記は変わりません。
+
+`EMAIL_NOTE` を空にすると「イベント終了後に〈壁紙の呼び名〉のダウンロード案内をお送りします。入力は任意で、
+他の個人情報はお伺いしません。」が出ます。文面を変えたいときだけ設定してください。
 
 `PARTY_SIZE_MAX` は、人数を選ぶプルダウンの上限です。`10` なら「1人」〜「9人」と
 「10人以上」が並び、**「10人以上」は10人として集計します**（多めには見積もりません）。
@@ -399,9 +412,9 @@ C:\xampp\php\php.exe bin\seed_traffic.php --force --visitors=200
 ## テスト
 
 ```
-C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（78項目）
+C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（80項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（291項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（293項目）
 node tests\scan_test.js                                   REM QR読み取り判定（27項目・Nodeがある場合のみ）
 ```
 

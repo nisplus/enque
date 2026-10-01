@@ -123,6 +123,10 @@ function config(): array
         'wallpaper_label'      => (string) env('WALLPAPER_LABEL', 'オリジナルのスマホ壁紙'),
         // 来場人数の選択肢の上限。これ以上は「◯人以上」としてまとめ、集計では上限の値で数える
         'party_size_max'       => max(2, (int) env('PARTY_SIZE_MAX', '10')),
+        // 来場者に見せるときの「出展のひとつ」の呼び方（ブース／企業／出展社 など）
+        'booth_label'          => (string) env('BOOTH_LABEL', 'ブース'),
+        // メールアドレス欄の説明文。空なら既定の文面（壁紙の呼び名を含む）を使う
+        'email_note'           => (string) env('EMAIL_NOTE', ''),
         // QR・メールに埋め込む公開URL（未設定ならリクエストから推定する）
         'base_url'             => rtrim((string) env('BASE_URL', ''), '/'),
         'pretty_urls'          => env_bool('PRETTY_URLS', true),
@@ -186,6 +190,31 @@ function wallpaper_label(): string
 function party_size_max(): int
 {
     return config()['party_size_max'];
+}
+
+/**
+ * 来場者向けの画面で使う「出展のひとつ」の呼び方（.env の BOOTH_LABEL、既定「ブース」）。
+ *
+ * 合同説明会のように「企業」と呼ぶイベントでは BOOTH_LABEL=企業 とする。
+ */
+function booth_label(): string
+{
+    return config()['booth_label'];
+}
+
+/**
+ * メールアドレス欄の説明文（.env の EMAIL_NOTE）。
+ *
+ * 未設定なら、壁紙の呼び名を使った既定の文面を出す。
+ */
+function email_note(): string
+{
+    $note = config()['email_note'];
+
+    return $note !== ''
+        ? $note
+        : 'イベント終了後に' . wallpaper_label() . 'のダウンロード案内をお送りします。'
+            . '入力は任意で、他の個人情報はお伺いしません。';
 }
 
 /**

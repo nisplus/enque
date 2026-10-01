@@ -24,6 +24,7 @@ function build_invite_mail(array $event, string $token, bool $answered = false):
     // アンケートと壁紙の呼び名は .env（OVERALL_SURVEY_LABEL / WALLPAPER_LABEL）で決める
     $survey    = overall_label();
     $wallpaper = wallpaper_label();
+    $booth     = booth_label();
 
     if ($answered) {
         $url     = wallpaper_url($token);
@@ -53,7 +54,7 @@ function build_invite_mail(array $event, string $token, bool $answered = false):
         $body = <<<TEXT
         このたびは「{$name}」にご来場いただき、ありがとうございました。
 
-        会場のブースでアンケートにご回答いただいた皆さまに、
+        会場の{$booth}でアンケートにご回答いただいた皆さまに、
         イベント全体についてお伺いする{$survey}をお願いしております。
 
         ご回答いただくと、その場で{$wallpaper}をダウンロードいただけます。

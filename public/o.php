@@ -45,7 +45,7 @@ if ($preview) {
     $invite = null;
     $event  = find_event_by_slug((string) (get_string('e') ?? ''));
     if ($event === null) {
-        abort(404, 'このURLは無効です。ブースのQRコードをもう一度読み取ってください。');
+        abort(404, 'このURLは無効です。' . booth_label() . 'のQRコードをもう一度読み取ってください。');
     }
     if ((string) $event['status'] !== 'open' || visitor_cookie_missing()) {
         // 受付が終わっているか、端末を特定できないときは回答済み画面へ戻す
