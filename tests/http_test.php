@@ -831,6 +831,64 @@ $res = request('POST', '/submit.php', [
 check('a second common answer is ignored',
     $res['status'] === 200 && count_responses($overallId) === $commonBefore, 'status=' . $res['status']);
 
+// 「お帰りの際に」と案内しているので、空欄のまま送れる（設問が必須でも足止めしない）
+$commonBefore = count_responses($overallId);
+$res = request('POST', '/submit.php', [
+    'survey_id'            => (string) $surveyAId,
+    'q[' . $qSingle . ']'  => '情報収集',
+    'q[' . $qMulti . '][]' => ['製品'],
+    'q[' . $qRating . ']'  => '4',
+    'q[' . $qText . ']'    => '',
+], 'common3', ['Accept: application/json']);
+check('a booth answer goes through with the common part left blank',
+    $res['status'] === 200, 'status=' . $res['status']);
+check('nothing is stored when the common part is blank',
+    count_responses($overallId) === $commonBefore);
+
+$res = request('GET', $surveyPathB, null, 'common3');
+check('the common survey comes back at the next booth', str_contains($res['body'], 'common-block'));
+check('the booth form says it can be left for the end',
+    str_contains($res['body'], '最後にお帰りの際にご記入ください'));
+
+// 回答済み画面からは、いつでも回答・修正できる
+$res = done_page('common3');
+check('the done page offers the common survey',
+    str_contains($res['body'], '>回答する<'), 'status=' . $res['status']);
+
+$res = request('GET', '/o.php?e=' . $eventSlug, null, 'common3');
+check('the common survey opens from the done page',
+    $res['status'] === 200 && str_contains($res['body'], 'TEST OVERALL'), 'status=' . $res['status']);
+
+$res = request('POST', '/submit.php', [
+    'survey_id'            => (string) $overallId,
+    'q[' . $overallQ . ']' => '4',
+], 'common3');
+check('answering from that page goes back to the done page',
+    $res['status'] === 302 && str_contains((string) $res['location'], 'ok=overall'),
+    'location=' . (string) $res['location']);
+
+$res = request('GET', (string) $res['location'], null, 'common3');
+check('the done page thanks the visitor', str_contains($res['body'], 'ご回答ありがとうございました'));
+check('the done page now offers to change the answer', str_contains($res['body'], '回答を変更する'));
+
+$res = request('GET', '/o.php?e=' . $eventSlug, null, 'common3');
+check('the previous answer is filled in for editing',
+    str_contains($res['body'], 'value="4" checked'), 'status=' . $res['status']);
+
+$commonBefore = count_responses($overallId);
+$res = request('POST', '/submit.php', [
+    'survey_id'            => (string) $overallId,
+    'q[' . $overallQ . ']' => '2',
+], 'common3');
+check('editing does not add another response', count_responses($overallId) === $commonBefore);
+
+$edited = db()->prepare(
+    'SELECT a.value FROM answers a JOIN responses r ON r.id = a.response_id
+     WHERE r.survey_id = ? AND a.question_id = ? ORDER BY r.id DESC LIMIT 1'
+);
+$edited->execute([$overallId, $overallQ]);
+check('the edited value replaces the old one', (string) $edited->fetchColumn() === '2');
+
 // 「2社目から」に変えると、1社目では出さずに2社目で出す
 update_event($eventId, (string) $event['name'], (string) $event['start_date'],
     (string) $event['end_date'], 'open', 2);
@@ -1151,6 +1209,18 @@ $res = request('POST', '/submit.php', [
     'q[' . $qSingle . ']' => '情報収集',
 ], 'visitor', ['Accept: application/json']);
 check('closed event rejects new submissions', $res['status'] === 400);
+
+// 受付終了後は、会期中の導線（Cookie経由）からは回答・修正できない
+$res = request('GET', '/o.php?e=' . $eventSlug, null, 'common3');
+check('the in-event link closes with the event',
+    $res['status'] === 302 && str_contains((string) $res['location'], '/done.php'),
+    'status=' . $res['status']);
+
+$res = request('POST', '/submit.php', [
+    'survey_id'            => (string) $overallId,
+    'q[' . $overallQ . ']' => '1',
+], 'common3', ['Accept: application/json']);
+check('a closed event rejects edits without a token', $res['status'] === 400, 'status=' . $res['status']);
 
 echo "=== email purge ===\n";
 

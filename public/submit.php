@@ -93,17 +93,25 @@ if ($type === 'company') {
     }
     $visitor = current_visitor((int) $event['id']);
 } elseif ($type === 'overall') {
-    // 総合アンケートはメールで配ったトークンでのみ回答できる
-    $token  = post_string('t') ?? '';
-    $invite = $token === '' ? null : find_invite_by_token($token);
-    if ($invite === null || (int) $invite['event_id'] !== (int) $event['id']) {
-        fail('closed');
+    $token = post_string('t') ?? '';
+    if ($token === '') {
+        // 会期中は、同じ端末の来場者が自分で回答・修正できる（回答済み画面からの導線）
+        if ((string) $event['status'] !== 'open') {
+            fail('closed');
+        }
+        $visitor = current_visitor((int) $event['id']);
+    } else {
+        // 会期後はメールで配ったトークンから回答する
+        $invite = find_invite_by_token($token);
+        if ($invite === null || (int) $invite['event_id'] !== (int) $event['id']) {
+            fail('closed');
+        }
+        $visitorRow = find_visitor((int) $invite['visitor_id']);
+        if ($visitorRow === null) {
+            fail('closed');
+        }
+        $visitor = $visitorRow;
     }
-    $visitorRow = find_visitor((int) $invite['visitor_id']);
-    if ($visitorRow === null) {
-        fail('closed');
-    }
-    $visitor = $visitorRow;
 } else {
     fail('closed'); // テンプレートは回答を受け付けない
 }
@@ -190,9 +198,22 @@ try {
         set_visitor_email((int) $visitor['id'], $emailInput);
     }
 
-    $result = insert_response($surveyId, (int) $visitor['id'], $answers);
+    if ($type === 'overall') {
+        // 書き直しのときは、回答の行はそのままに中身だけ入れ替える
+        $existing = find_response($surveyId, (int) $visitor['id']);
+        if ($existing !== null) {
+            replace_response_answers((int) $existing['id'], $answers);
+            $result = ['response_id' => (int) $existing['id'], 'is_duplicate' => false];
+        } else {
+            $result = insert_response($surveyId, (int) $visitor['id'], $answers);
+        }
+    } else {
+        $result = insert_response($surveyId, (int) $visitor['id'], $answers);
+    }
 
-    if ($common !== null) {
+    // 共通アンケートは、1問でも書いてくれたときだけ保存する。
+    // 空欄のまま送れば未回答のままなので、次のブースの画面にまた出る。
+    if ($common !== null && array_filter($commonAnswers, static fn($v): bool => $v !== null) !== []) {
         insert_response((int) $common['survey']['id'], (int) $visitor['id'], $commonAnswers);
     }
 
@@ -203,6 +224,11 @@ try {
         $claim    = find_or_create_claim((int) $visitor['id']);
         $redirect = '/done.php?e=' . rawurlencode((string) $event['slug'])
             . '&c=' . rawurlencode((string) $claim['claim_code']);
+    } elseif ($token === '') {
+        // 会期中の回答・修正は、回答済み画面に戻して結果を知らせる
+        $claim    = find_or_create_claim((int) $visitor['id']);
+        $redirect = '/done.php?e=' . rawurlencode((string) $event['slug'])
+            . '&c=' . rawurlencode((string) $claim['claim_code']) . '&ok=overall';
     } else {
         mark_invite_responded((int) $invite['id']);
         $redirect = '/wallpaper.php?t=' . rawurlencode((string) $invite['token']);

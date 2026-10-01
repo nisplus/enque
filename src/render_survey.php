@@ -79,9 +79,10 @@ function render_survey_page(array $view): void
     // 共通アンケート。まだ答えていない来場者にだけ、ブースの設問に続けて出す
     if (is_array($common)) {
         echo '<div class="common-block">';
-        echo '<h2>' . e(overall_label()) . '<span class="badge badge-optional">この1回だけ</span></h2>';
-        echo '<p class="text-secondary">イベント全体についてお伺いします。';
-        echo 'ほかのブースでは表示されませんので、この画面でご回答ください。</p>';
+        echo '<h2>' . e(overall_label()) . '<span class="badge badge-optional">イベント全体について</span></h2>';
+        echo '<p class="text-secondary"><strong>最後にお帰りの際にご記入ください。</strong>';
+        echo 'ここは空欄のままで送信していただいて構いません（次のブースの画面にも出ます）。';
+        echo 'ご記入後に内容を変えることもできます。</p>';
         foreach ($common['questions'] as $question) {
             render_question($question, $view['previous'], in_array((int) $question['id'], $view['invalid'], true));
         }

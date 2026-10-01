@@ -174,7 +174,10 @@ function overall_survey(int $eventId): ?array
  *
  * 出す条件は、公開済みで設問があり、その来場者がまだ答えておらず、
  * イベント設定の「何社目のブースから出すか」に達していること。
- * 一度答えたら二度と出さないので、来場者は何社回っても入力は1回で済む。
+ * 答えるまでは毎回出し、答えたあとは出さない。
+ *
+ * ブースの画面では設問をすべて任意にする。来場者には「お帰りの際に」と
+ * 案内しているため、途中のブースで必須にして足止めしないようにするため。
  *
  * @param array<string,mixed> $event
  * @return array{survey: array<string,mixed>, questions: list<array<string,mixed>>}|null
@@ -197,7 +200,13 @@ function common_survey_block(array $event, int $visitorId): ?array
         return null;
     }
 
-    return ['survey' => $survey, 'questions' => $questions];
+    $optional = array_map(static function (array $question): array {
+        $question['required'] = 0;
+
+        return $question;
+    }, $questions);
+
+    return ['survey' => $survey, 'questions' => $optional];
 }
 
 /** その来場者が共通アンケートに答えているか */
@@ -524,6 +533,71 @@ function answers_for_responses(array $responseIds): array
     }
 
     return $map;
+}
+
+/** その来場者のこのアンケートへの回答（重複を除く最初の1件）。無ければ null */
+function find_response(int $surveyId, int $visitorId): ?array
+{
+    $stmt = db()->prepare(
+        'SELECT * FROM responses WHERE survey_id = ? AND visitor_id = ? AND is_duplicate = 0 ORDER BY id LIMIT 1'
+    );
+    $stmt->execute([$surveyId, $visitorId]);
+    $row = $stmt->fetch();
+
+    return $row === false ? null : $row;
+}
+
+/**
+ * 回答の内容を、入力フォームの初期値として使える形で取り出す。
+ *
+ * 複数選択はJSON配列で保存しているので、配列に戻してから返す。
+ *
+ * @param list<array<string,mixed>> $questions
+ * @return array<int, string|list<string>>
+ */
+function response_values(int $responseId, array $questions): array
+{
+    $stored = answers_for_responses([$responseId])[$responseId] ?? [];
+    $values = [];
+
+    foreach ($questions as $question) {
+        $qid = (int) $question['id'];
+        if (!isset($stored[$qid])) {
+            continue;
+        }
+        if ((string) $question['type'] === 'multi') {
+            $decoded      = json_decode((string) $stored[$qid], true);
+            $values[$qid] = is_array($decoded) ? array_map('strval', $decoded) : [];
+            continue;
+        }
+        $values[$qid] = (string) $stored[$qid];
+    }
+
+    return $values;
+}
+
+/**
+ * 回答の内容を入れ替える（総合アンケートの書き直し用）。
+ *
+ * 回答そのもの（responses の行）は作り直さず、中身だけ差し替える。
+ * 回答日時を保ったまま、来場者が何度でも直せるようにするため。
+ *
+ * @param array<int, string|null> $answers
+ */
+function replace_response_answers(int $responseId, array $answers): void
+{
+    db_transaction(static function () use ($responseId, $answers): void {
+        $delete = db()->prepare('DELETE FROM answers WHERE response_id = ?');
+        $delete->execute([$responseId]);
+
+        $insert = db()->prepare('INSERT INTO answers (response_id, question_id, value) VALUES (?, ?, ?)');
+        foreach ($answers as $questionId => $value) {
+            if ($value === null) {
+                continue;
+            }
+            $insert->execute([$responseId, (int) $questionId, $value]);
+        }
+    });
 }
 
 /**

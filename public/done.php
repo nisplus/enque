@@ -127,6 +127,35 @@ foreach ($visited as $row) {
 }
 echo '</ul>';
 
+// 総合アンケート（イベント全体について聞くもの）。開催中は、ここから回答・修正できる
+$overall = overall_survey((int) $event['id']);
+if ($overall !== null && (int) $overall['is_published'] === 1 && questions_for_survey((int) $overall['id']) !== []) {
+    $overallAnswered = has_response((int) $overall['id'], (int) $visitor['id']);
+    $overallOpen     = (string) $event['status'] === 'open';
+
+    if ((get_string('ok') ?? '') === 'overall') {
+        echo '<div class="alert alert-success">' . e(overall_label()) . 'にご回答ありがとうございました。</div>';
+    }
+
+    if ($overallOpen || $overallAnswered) {
+        echo '<div class="card">';
+        echo '<h2 style="margin-top:0">' . e(overall_label()) . '</h2>';
+        if ($overallAnswered) {
+            echo '<p>ご回答ありがとうございました。';
+            echo $overallOpen ? '内容はお帰りまで何度でも直せます。</p>' : '</p>';
+        } else {
+            echo '<p>イベント全体についてお聞かせください。<strong>お帰りの際で結構です。</strong>';
+            echo 'ブースのアンケート画面からでも、この画面からでもご回答いただけます。</p>';
+        }
+        if ($overallOpen) {
+            echo '<div class="btn-row"><a class="btn' . ($overallAnswered ? '' : ' btn-primary')
+                . '" href="/o.php?e=' . rawurlencode($eventSlug) . '">'
+                . ($overallAnswered ? '回答を変更する' : '回答する') . '</a></div>';
+        }
+        echo '</div>';
+    }
+}
+
 if ($saved) {
     // 自分で入力した直後の1回だけは、そのまま出して確認してもらう
     echo '<div class="alert alert-success">メールアドレスを' . ($changed ? '変更' : '登録') . 'しました（<strong>'

@@ -7,8 +7,9 @@ declare(strict_types=1);
  * 会期中はブースのアンケートに混ぜて集めるため、この画面を開くのは
  * 会場で答えなかった人だけになる（答えていれば壁紙の画面へ送る）。
  *
- *   /o/<トークン>      （mod_rewrite 経由）
+ *   /o/<トークン>      （mod_rewrite 経由。会期後のメールから）
  *   /o.php?t=<トークン>
+ *   /o.php?e=<イベント>  （会期中。回答済み画面からの導線で、同じ端末の来場者が回答・修正する）
  */
 
 require_once dirname(__DIR__) . '/src/bootstrap.php';
@@ -39,8 +40,20 @@ if ($preview) {
     if ($event === null) {
         abort(404, 'イベントが見つかりません。');
     }
+} elseif ($token === '') {
+    // 会期中、来場者が自分で回答・修正する（回答済み画面からの導線。トークンは使わない）
+    $invite = null;
+    $event  = find_event_by_slug((string) (get_string('e') ?? ''));
+    if ($event === null) {
+        abort(404, 'このURLは無効です。ブースのQRコードをもう一度読み取ってください。');
+    }
+    if ((string) $event['status'] !== 'open' || visitor_cookie_missing()) {
+        // 受付が終わっているか、端末を特定できないときは回答済み画面へ戻す
+        redirect('/done.php?e=' . rawurlencode((string) $event['slug']));
+    }
+    $visitor = current_visitor((int) $event['id']);
 } else {
-    $invite = $token === '' ? null : find_invite_by_token($token);
+    $invite = find_invite_by_token($token);
     if ($invite === null) {
         abort(404, 'このURLは無効です。メールに記載されたリンクをもう一度お試しください。');
     }
@@ -72,19 +85,39 @@ if ($survey === null || $questions === [] || ((int) $survey['is_published'] !== 
     exit;
 }
 
+// 会期中の画面では、前に書いた内容を出して直せるようにする
+$previous = [];
+$answered = false;
+if (!$preview && $token === '') {
+    $response = find_response((int) $survey['id'], (int) $visitor['id']);
+    if ($response !== null) {
+        $previous = response_values((int) $response['id'], $questions);
+        $answered = true;
+    }
+}
+
+$footer = 'ご回答後、' . wallpaper_label() . 'をダウンロードいただけます。';
+if ($preview) {
+    $footer = 'これはスタッフ確認用のプレビューです。来場者には、その方専用のURLが記載されたメールが届きます。';
+} elseif ($token === '') {
+    $footer = $answered
+        ? '書き直した内容で上書きします。イベント開催中は何度でも直せます。'
+        : 'お帰りの前にご回答ください。送信後も、開催中であれば内容を直せます。';
+}
+
 render_survey_page([
     'event'       => $event,
     'company'     => null,
     'survey'      => $survey,
     'questions'   => $questions,
-    'hidden'      => ['survey_id' => (string) $survey['id'], 't' => $token],
+    'hidden'      => $token === ''
+        ? ['survey_id' => (string) $survey['id']]
+        : ['survey_id' => (string) $survey['id'], 't' => $token],
     'ask_email'   => false,
-    'previous'    => [],
+    'previous'    => $previous,
     'invalid'     => [],
     'error'       => submit_error_message(get_string('err')),
     'email_value' => '',
     'preview'     => $preview,
-    'footer_note' => $preview
-        ? 'これはスタッフ確認用のプレビューです。来場者には、その方専用のURLが記載されたメールが届きます。'
-        : 'ご回答後、' . wallpaper_label() . 'をダウンロードいただけます。',
+    'footer_note' => $footer,
 ]);
