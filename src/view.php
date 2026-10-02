@@ -70,7 +70,7 @@ function event_status_label(string $status): string
     return match ($status) {
         'draft'  => '準備中',
         'open'   => '開催中（回答受付）',
-        'closed' => '終了（総合アンケート送付）',
+        'closed' => '終了（案内メール送付）',
         default  => $status,
     };
 }

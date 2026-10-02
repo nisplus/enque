@@ -197,7 +197,7 @@ if ($party['configured'] && $party['answered'] > 0) {
 render_stat('のべ訪問数', count_label($summary['visits'], '件'), '各企業の回答者数の合計');
 render_stat('総回答数', count_label($summary['responses']), '重複' . $summary['duplicates'] . '件を除く');
 render_stat('平均訪問企業数', (string) $summary['avg_companies'] . '社', '1人あたり');
-render_stat('メール登録', count_label($summary['emails'], '人'), '総合アンケートの案内先');
+render_stat('メール登録', count_label($summary['emails'], '人'), e(wallpaper_label()) . 'のご案内先');
 render_stat('交換コード', count_label($summary['claims']), '交換済み ' . $summary['claimed'] . '件');
 echo '</div>';
 
@@ -252,9 +252,9 @@ echo '<a class="btn" href="companies.php?event=' . $eventId . '">企業・QRコ�
 echo '<a class="btn" href="export_csv.php?event=' . $eventId . '">全企業分のCSV</a>';
 echo '</div></div>';
 
-echo '<h2>総合アンケート・壁紙</h2>';
+echo '<h2>' . e(overall_label()) . '・壁紙</h2>';
 echo '<div class="card">';
-echo '<p>総合アンケート：';
+echo '<p>' . e(overall_label()) . '：';
 if ($overall === null) {
     echo '<span class="badge badge-optional">未作成</span>';
 } else {
@@ -268,7 +268,7 @@ echo '<p>案内メール：送信済み ' . $invites['sent'] . '件／未送信 
     . '件／失敗 ' . $invites['failed'] . '件／回答 ' . $invites['responded'] . '件</p>';
 echo '<p>共通設問テンプレート：' . ($template === null ? '未作成' : e((string) $template['title'])) . '</p>';
 echo '<div class="btn-row">';
-echo '<a class="btn" href="invites.php?event=' . $eventId . '">総合アンケートと案内メール</a>';
+echo '<a class="btn" href="invites.php?event=' . $eventId . '">' . e(overall_label()) . 'と案内メール</a>';
 echo '<a class="btn" href="wallpapers.php?event=' . $eventId . '">壁紙の登録</a>';
 echo '</div></div>';
 
