@@ -94,6 +94,11 @@ render_alert(flash_take());
 echo '<h1>' . e(overall_label()) . 'と案内メール</h1>';
 echo '<p class="muted">' . e((string) $event['name']) . '（' . e(event_status_label((string) $event['status'])) . '）</p>';
 
+if (!collect_email()) {
+    echo '<div class="alert alert-warn">メールアドレスの収集が<strong>無効</strong>です（.env の <code class="mono">COLLECT_EMAIL=0</code>）。';
+    echo '来場者の画面に入力欄が出ないため、新しい宛先は増えません。案内メールを送るには、設定を戻してください。</div>';
+}
+
 if (mail_is_configured()) {
     echo '<p class="muted">送信方式：' . e(mail_transport_label()) . '</p>';
 } else {

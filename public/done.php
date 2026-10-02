@@ -97,7 +97,7 @@ if ($visited === []) {
 $saved   = false;
 $changed = false;
 $error   = null;
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && collect_email()) {
     $email = trim_ja((string) (post_string('email') ?? ''));
     if ($email === '' || !is_valid_email($email)) {
         $error = 'メールアドレスの形式が正しくありません。';
@@ -201,7 +201,9 @@ if ($error !== null) {
     echo '<div class="alert alert-error">' . e($error) . '</div>';
 }
 
-if (($visitor['email'] ?? null) === null) {
+if (!collect_email()) {
+    // メールアドレスを集めない運用（.env の COLLECT_EMAIL=0）では、入力欄も案内も出さない
+} elseif (($visitor['email'] ?? null) === null) {
     echo '<div class="card">';
     echo '<h2 style="margin-top:0">スマホ壁紙をご希望の方へ</h2>';
     echo '<p>' . e(email_note()) . '</p>';

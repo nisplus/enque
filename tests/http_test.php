@@ -933,7 +933,13 @@ check('nothing is stored when the common part is blank',
 $res = request('GET', $surveyPathB, null, 'common3');
 check('the common survey comes back at the next booth', str_contains($res['body'], 'common-block'));
 check('the booth form says it can be left for the end',
-    str_contains($res['body'], '最後にお帰りの際にご記入ください'));
+    str_contains($res['body'], 'お帰りの前でも結構です'));
+check('the booth form says the answer can be changed later',
+    str_contains($res['body'], '何度でも書き直せます'));
+
+// 総合アンケートは、ブースでも単独画面でも必ず「任意」
+check('the common questions are never marked as required',
+    !preg_match('#<div class="common-block">.*?badge-required#s', $res['body']));
 
 // 回答済み画面からは、いつでも回答・修正できる
 $res = done_page('common3');
@@ -973,6 +979,22 @@ $edited = db()->prepare(
 );
 $edited->execute([$overallId, $overallQ]);
 check('the edited value replaces the old one', (string) $edited->fetchColumn() === '2');
+
+// 設問が必須で登録されていても、どの画面でも任意として出す（画面ごとに入れ替わらない）
+$overallRow = questions_for_survey($overallId)[0];
+check('the question itself is stored as required', (int) $overallRow['required'] === 1);
+
+$res = request('GET', '/o.php?e=' . $eventSlug, null, 'common3');
+check('the stand-alone page still shows it as optional',
+    !str_contains($res['body'], 'badge-required'), 'status=' . $res['status']);
+
+$res = request('POST', '/submit.php', ['survey_id' => (string) $overallId], 'common3', ['Accept: application/json']);
+check('an answer with nothing filled in is refused', $res['status'] === 400, 'status=' . $res['status']);
+
+$res = request('GET', '/admin/survey_edit.php?survey=' . $overallId, null, 'org');
+check('the editor does not offer "required" for the overall survey',
+    !str_contains($res['body'], '必須にする') && str_contains($res['body'], '必須にできません'),
+    'status=' . $res['status']);
 
 // 「2社目から」に変えると、1社目では出さずに2社目で出す
 update_event($eventId, (string) $event['name'], (string) $event['start_date'],

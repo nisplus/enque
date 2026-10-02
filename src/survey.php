@@ -110,6 +110,25 @@ function is_party_size_question(array $question): bool
 }
 
 /**
+ * すべて任意回答として扱う設問の並びを返す。
+ *
+ * 総合アンケートは「お帰りの前でよい・あとから直せる」案内で出しているため、
+ * どの画面でも必須にしない。画面によって必須・任意が入れ替わると、
+ * 書き直すときに「必須に変わった」ように見えてしまうため、ここで揃える。
+ *
+ * @param list<array<string,mixed>> $questions
+ * @return list<array<string,mixed>>
+ */
+function as_optional_questions(array $questions): array
+{
+    return array_map(static function (array $question): array {
+        $question['required'] = 0;
+
+        return $question;
+    }, $questions);
+}
+
+/**
  * 設問行の options（JSON文字列）を配列に戻す。
  *
  * @return list<string>

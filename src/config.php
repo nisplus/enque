@@ -127,6 +127,8 @@ function config(): array
         'booth_label'          => (string) env('BOOTH_LABEL', 'ブース'),
         // メールアドレス欄の説明文。空なら既定の文面（壁紙の呼び名を含む）を使う
         'email_note'           => (string) env('EMAIL_NOTE', ''),
+        // メールアドレスを集めるかどうか。0 にすると来場者の画面から入力欄が消える
+        'collect_email'        => env_bool('COLLECT_EMAIL', true),
         // QR・メールに埋め込む公開URL（未設定ならリクエストから推定する）
         'base_url'             => rtrim((string) env('BASE_URL', ''), '/'),
         'pretty_urls'          => env_bool('PRETTY_URLS', true),
@@ -200,6 +202,17 @@ function party_size_max(): int
 function booth_label(): string
 {
     return config()['booth_label'];
+}
+
+/**
+ * メールアドレスを集めるか（.env の COLLECT_EMAIL、既定は集める）。
+ *
+ * 0 にすると、回答画面と回答済み画面から入力欄が消える。
+ * 集めない運用では壁紙の案内メールも送れない（宛先が無いため）。
+ */
+function collect_email(): bool
+{
+    return config()['collect_email'];
 }
 
 /**

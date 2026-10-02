@@ -124,7 +124,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 'label'    => $q['label'],
                 'options'  => $q['options'],
                 'number'   => $q['number'],
-                'required' => $q['required'],
+                // 総合アンケートはどの画面でも任意回答にするため、必須は保存しない
+                'required' => (string) $survey['type'] === 'overall' ? false : $q['required'],
                 'metric'   => $q['metric'],
             ],
             $questions
@@ -185,7 +186,9 @@ $index = 0;
  * 画面の先頭ではなく追加された設問が見えるようにする（$isNew のときは入力欄に
  * カーソルも当てる）。
  */
-$render = static function (?array $question, int $index, bool $isNew = false): void {
+$alwaysOptional = (string) $survey['type'] === 'overall';
+
+$render = static function (?array $question, int $index, bool $isNew = false) use ($alwaysOptional): void {
     $id       = $question === null ? 0 : (int) $question['id'];
     $type     = $question === null ? 'single' : (string) $question['type'];
     $label    = $question === null ? '' : (string) $question['label'];
@@ -228,8 +231,14 @@ $render = static function (?array $question, int $index, bool $isNew = false): v
     echo '<textarea name="q[' . $index . '][options]" rows="4">' . e($optionText) . '</textarea></label>';
 
     echo '<div class="q-grid">';
-    echo '<label class="choice"><input type="checkbox" name="q[' . $index . '][required]" value="1"'
-        . ($required ? ' checked' : '') . '><span>必須にする</span></label>';
+    if ($alwaysOptional) {
+        // 総合アンケートは「お帰りの前でよい・あとから直せる」案内で出すため、必ず任意
+        echo '<p class="muted" style="margin:0">この設問は<strong>任意回答</strong>です';
+        echo '（' . e(overall_label()) . 'は必須にできません）。</p>';
+    } else {
+        echo '<label class="choice"><input type="checkbox" name="q[' . $index . '][required]" value="1"'
+            . ($required ? ' checked' : '') . '><span>必須にする</span></label>';
+    }
     echo '<label class="field">並び順<input type="number" name="q[' . $index . '][sort]" value="' . ($index + 1) . '"></label>';
     echo '</div>';
 

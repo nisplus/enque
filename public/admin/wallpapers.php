@@ -121,6 +121,11 @@ render_alert(flash_take());
 
 echo '<h1>スマホ壁紙の登録</h1>';
 echo '<p class="muted">' . e((string) $event['name']) . '</p>';
+if (!collect_email()) {
+    echo '<div class="alert alert-warn">メールアドレスの収集が<strong>無効</strong>です（.env の <code class="mono">COLLECT_EMAIL=0</code>）。';
+    echo '壁紙は案内メールのリンクから配るため、この設定のままでは配布できません。</div>';
+}
+
 echo '<div class="alert alert-info">壁紙は「' . e(overall_label()) . '」に回答した来場者だけがダウンロードできます';
 echo '（会期中にブースの画面で答えた方も含みます）。';
 echo '端末に合わせて選べるよう、縦長（例：1080×2340）を1〜2種類登録しておくことをおすすめします。</div>';

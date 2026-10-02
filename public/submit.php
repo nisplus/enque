@@ -80,6 +80,10 @@ if ((int) $survey['is_published'] !== 1 || $questions === []) {
 }
 
 $type    = (string) $survey['type'];
+if ($type === 'overall') {
+    // 総合アンケートはどの画面でも任意回答（代わりに、1問も書かずに送ることはできない）
+    $questions = as_optional_questions($questions);
+}
 $company = null;
 $invite  = null;
 
@@ -124,7 +128,7 @@ if (is_array($posted)) {
         $previous[(int) $qid] = $value;
     }
 }
-$emailInput = trim_ja((string) (post_string('email') ?? ''));
+$emailInput = collect_email() ? trim_ja((string) (post_string('email') ?? '')) : '';
 
 // ブースのアンケートに混ぜた共通アンケート。出す条件を満たすときだけ受け付ける
 // （既に答えている人が送ってきても、ここで null になるので保存しない）
@@ -186,6 +190,11 @@ if ($common !== null) {
 
 if ($invalid !== []) {
     fail((string) $firstErr, $invalid, $view);
+}
+
+// 総合アンケートの単独画面は、全問空のまま送れないようにする（空の回答で壁紙に進めないため）
+if ($type === 'overall' && array_filter($answers, static fn($v): bool => $v !== null) === []) {
+    fail('empty', [], $view);
 }
 
 if ($emailInput !== '' && !is_valid_email($emailInput)) {

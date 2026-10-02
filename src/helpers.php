@@ -273,6 +273,7 @@ function submit_error_message(?string $code): ?string
         'length'     => '自由記述は' . TEXT_ANSWER_MAX_LENGTH . '文字以内で入力してください。',
         'email'      => 'メールアドレスの形式が正しくありません。',
         'encoding'   => '入力の文字コードが不正です（UTF-8で送信してください）。',
+        'empty'      => '1問以上お答えください。',
         'closed'     => 'このアンケートは現在受け付けていません。',
         'system'     => '送信できませんでした。通信状況をご確認のうえ、もう一度お試しください。',
     ];

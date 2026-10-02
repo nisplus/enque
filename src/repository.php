@@ -243,13 +243,7 @@ function common_survey_block(array $event, int $visitorId): ?array
         return null;
     }
 
-    $optional = array_map(static function (array $question): array {
-        $question['required'] = 0;
-
-        return $question;
-    }, $questions);
-
-    return ['survey' => $survey, 'questions' => $optional];
+    return ['survey' => $survey, 'questions' => as_optional_questions($questions)];
 }
 
 /** その来場者が共通アンケートに答えているか */

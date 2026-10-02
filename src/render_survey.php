@@ -80,16 +80,16 @@ function render_survey_page(array $view): void
     if (is_array($common)) {
         echo '<div class="common-block">';
         echo '<h2>' . e(overall_label()) . '<span class="badge badge-optional">イベント全体について</span></h2>';
-        echo '<p class="text-secondary"><strong>最後にお帰りの際にご記入ください。</strong>';
-        echo 'ここは空欄のままで送信していただいて構いません（次の' . e(booth_label()) . 'の画面にも出ます）。';
-        echo 'ご記入後に内容を変えることもできます。</p>';
+        echo '<p class="text-secondary">いまご記入いただいても、<strong>お帰りの前でも結構です。</strong>';
+        echo '空欄のまま送信していただいても構いません（次の' . e(booth_label()) . 'の画面にも出ます）。';
+        echo '<strong>送信後も、開催中であれば何度でも書き直せます。</strong></p>';
         foreach ($common['questions'] as $question) {
             render_question($question, $view['previous'], in_array((int) $question['id'], $view['invalid'], true));
         }
         echo '</div>';
     }
 
-    if ($view['ask_email']) {
+    if ($view['ask_email'] && collect_email()) {
         // 登録済みの人には、確認できるよう入れてあるアドレスを埋めて出す。
         // 本人だけが見ている入力画面なので伏せ字にはしない（打ち間違いに気づけるように）。
         $known = ($view['email_known'] ?? false) === true;
