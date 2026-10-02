@@ -175,6 +175,21 @@ a  { color: var(--accent); }
 .rating label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
 .rating input { position: absolute; opacity: 0; width: 0; height: 0; }
 .rating .scale-ends { display: flex; justify-content: space-between; width: 100%; font-size: .8rem; color: var(--text-muted); }
+/* 星は数が増えるほど横に伸びるので、画面が狭いときは星だけ小さくする
+   （枠からはみ出さないようにするため。下の数字は読みやすい大きさのまま） */
+.rating-stars .stars { display: block; white-space: nowrap; letter-spacing: -.04em; }
+.rating-stars .muted { display: block; }
+@media (max-width: 480px) {
+  .rating { gap: 6px; }
+  .rating label { flex-basis: 44px; min-width: 44px; padding: 10px 3px; }
+  .rating-stars .stars { font-size: .68rem; letter-spacing: -.06em; }
+  .rating .scale-ends { font-size: .75rem; }
+}
+@media (max-width: 360px) {
+  .rating { gap: 4px; }
+  .rating label { flex-basis: 40px; min-width: 40px; padding: 10px 2px; }
+  .rating-stars .stars { font-size: .56rem; }
+}
 
 textarea, input[type="text"], input[type="email"], input[type="password"], input[type="date"], input[type="number"], select {
   width: 100%; padding: 11px 12px; font-size: 1rem; font-family: inherit;

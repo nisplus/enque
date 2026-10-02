@@ -149,12 +149,16 @@ function render_question(array $question, array $previous = [], bool $invalid = 
             break;
 
         case QuestionType::Rating:
-            echo '<div class="rating">';
+            // 星は span で囲む。狭い画面ではここだけ小さくして、枠からはみ出さないようにする
+            echo '<div class="rating rating-stars">';
             for ($i = 1; $i <= RATING_MAX; $i++) {
                 $checked = is_string($old) && (int) $old === $i ? ' checked' : '';
                 echo '<label><input type="radio" name="' . e($name) . '" value="' . $i . '"' . $checked . '>'
-                    . str_repeat('★', $i) . '<br><span class="muted">' . $i . '</span></label>';
+                    . '<span class="stars">' . str_repeat('★', $i) . '</span>'
+                    . '<span class="muted">' . $i . '</span></label>';
             }
+            echo '<div class="scale-ends"><span>1：満足していない</span><span>'
+                . RATING_MAX . '：満足している</span></div>';
             echo '</div>';
             break;
 

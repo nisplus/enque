@@ -212,6 +212,13 @@ check('survey page escapes script tags in labels',
     !str_contains($res['body'], '<script>alert(1)</script>') && str_contains($res['body'], '&lt;script&gt;'));
 check('survey page marks required questions', str_contains($res['body'], '必須'));
 check('survey page asks for an optional email', str_contains($res['body'], 'name="email"'));
+
+// 星は span で囲む（狭い画面で星だけ小さくして、枠からはみ出さないようにしている）
+check('the stars sit in their own element',
+    str_contains($res['body'], 'class="rating rating-stars"')
+    && str_contains($res['body'], '<span class="stars">★★★★★</span>'));
+check('the rating shows which end is which',
+    str_contains($res['body'], '1：満足していない') && str_contains($res['body'], '：満足している'));
 check('visitor cookie is issued', str_contains($res['headers'], 'enque_vid='));
 
 $res = request('GET', '/s/' . $eventSlug . '/deadbeefdeadbeef');
