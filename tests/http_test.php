@@ -937,9 +937,13 @@ check('the booth form says it can be left for the end',
 check('the booth form says the answer can be changed later',
     str_contains($res['body'], '何度でも書き直せます'));
 
-// 総合アンケートは、ブースでも単独画面でも必ず「任意」
-check('the common questions are never marked as required',
+// 総合アンケートは送信を止めないが、必須指定の設問には「要回答」の印を出す
+check('the common questions never show the blocking badge',
     !preg_match('#<div class="common-block">.*?badge-required#s', $res['body']));
+check('a required common question is marked as 要回答',
+    preg_match('#<div class="common-block">.*?badge-warn">要回答#s', $res['body']) === 1);
+check('the block explains what the mark means',
+    str_contains($res['body'], 'お帰りまでにご回答をお願いします'));
 
 // 回答済み画面からは、いつでも回答・修正できる
 $res = done_page('common3');
@@ -980,20 +984,36 @@ $edited = db()->prepare(
 $edited->execute([$overallId, $overallQ]);
 check('the edited value replaces the old one', (string) $edited->fetchColumn() === '2');
 
+// 「要回答」が空のままなら、回答済み画面で残り数を伝えて仕上げてもらう
+$left = unanswered_required_overall($eventId, $commonVisitor);
+check('an unanswered 要回答 question is counted', $left === 0, 'left=' . $left);
+
+db()->prepare('DELETE a FROM answers a JOIN responses r ON r.id = a.response_id
+                WHERE r.survey_id = ? AND r.visitor_id = ? AND a.question_id = ?')
+    ->execute([$overallId, $commonVisitor, $overallQ]);
+check('clearing the answer makes it show up as unanswered',
+    unanswered_required_overall($eventId, $commonVisitor) === 1);
+
+$res = done_page('common1');
+check('the done page asks the visitor to finish it',
+    str_contains($res['body'], '「要回答」の設問が1問残っています')
+    && str_contains($res['body'], '回答を仕上げる'), 'status=' . $res['status']);
+
 // 設問が必須で登録されていても、どの画面でも任意として出す（画面ごとに入れ替わらない）
 $overallRow = questions_for_survey($overallId)[0];
 check('the question itself is stored as required', (int) $overallRow['required'] === 1);
 
 $res = request('GET', '/o.php?e=' . $eventSlug, null, 'common3');
-check('the stand-alone page still shows it as optional',
-    !str_contains($res['body'], 'badge-required'), 'status=' . $res['status']);
+check('the stand-alone page uses the same mark',
+    !str_contains($res['body'], 'badge-required') && str_contains($res['body'], '要回答'),
+    'status=' . $res['status']);
 
 $res = request('POST', '/submit.php', ['survey_id' => (string) $overallId], 'common3', ['Accept: application/json']);
 check('an answer with nothing filled in is refused', $res['status'] === 400, 'status=' . $res['status']);
 
 $res = request('GET', '/admin/survey_edit.php?survey=' . $overallId, null, 'org');
-check('the editor does not offer "required" for the overall survey',
-    !str_contains($res['body'], '必須にする') && str_contains($res['body'], '必須にできません'),
+check('the editor offers 要回答 instead of 必須 for the overall survey',
+    str_contains($res['body'], '要回答にする') && !str_contains($res['body'], '必須にする'),
     'status=' . $res['status']);
 
 // 「2社目から」に変えると、1社目では出さずに2社目で出す

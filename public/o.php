@@ -71,7 +71,7 @@ if ($preview) {
 
 $survey    = overall_survey((int) $event['id']);
 // どの画面でも任意回答に揃える（ブースの画面と必須・任意が入れ替わらないように）
-$questions = $survey === null ? [] : as_optional_questions(questions_for_survey((int) $survey['id']));
+$questions = $survey === null ? [] : as_soft_required_questions(questions_for_survey((int) $survey['id']));
 
 if ($survey === null || $questions === [] || ((int) $survey['is_published'] !== 1 && !$preview)) {
     page_header('総合アンケート｜' . (string) $event['name'], ['brand' => (string) $event['name']]);

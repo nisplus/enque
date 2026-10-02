@@ -110,22 +110,32 @@ function is_party_size_question(array $question): bool
 }
 
 /**
- * すべて任意回答として扱う設問の並びを返す。
+ * 総合アンケート用に、必須を「要回答」へ読み替えた設問の並びを返す。
  *
  * 総合アンケートは「お帰りの前でよい・あとから直せる」案内で出しているため、
- * どの画面でも必須にしない。画面によって必須・任意が入れ替わると、
- * 書き直すときに「必須に変わった」ように見えてしまうため、ここで揃える。
+ * どの画面でも送信は止めない（required は 0 にする）。ただし主催者が必須に
+ * 指定した設問は、画面に「要回答」の印を出して回答をお願いする。
+ *
+ * 画面によって必須・任意が入れ替わると、書き直すときに「必須に変わった」ように
+ * 見えてしまうため、印の出し方も全画面でここに揃える。
  *
  * @param list<array<string,mixed>> $questions
  * @return list<array<string,mixed>>
  */
-function as_optional_questions(array $questions): array
+function as_soft_required_questions(array $questions): array
 {
     return array_map(static function (array $question): array {
-        $question['required'] = 0;
+        $question['soft_required'] = (int) ($question['required'] ?? 0) === 1;
+        $question['required']      = 0;
 
         return $question;
     }, $questions);
+}
+
+/** 「要回答」の印を出す設問か（総合アンケートの必須指定） */
+function is_soft_required(array $question): bool
+{
+    return ($question['soft_required'] ?? false) === true;
 }
 
 /**

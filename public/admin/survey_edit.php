@@ -124,8 +124,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 'label'    => $q['label'],
                 'options'  => $q['options'],
                 'number'   => $q['number'],
-                // 総合アンケートはどの画面でも任意回答にするため、必須は保存しない
-                'required' => (string) $survey['type'] === 'overall' ? false : $q['required'],
+                'required' => $q['required'],
                 'metric'   => $q['metric'],
             ],
             $questions
@@ -232,9 +231,11 @@ $render = static function (?array $question, int $index, bool $isNew = false) us
 
     echo '<div class="q-grid">';
     if ($alwaysOptional) {
-        // 総合アンケートは「お帰りの前でよい・あとから直せる」案内で出すため、必ず任意
-        echo '<p class="muted" style="margin:0">この設問は<strong>任意回答</strong>です';
-        echo '（' . e(overall_label()) . 'は必須にできません）。</p>';
+        // 総合アンケートは送信を止めない。チェックは「要回答」の印を出すかどうか
+        echo '<label class="choice"><input type="checkbox" name="q[' . $index . '][required]" value="1"'
+            . ($required ? ' checked' : '') . '><span>要回答にする';
+        echo '<span class="hint">お帰りまでに答えてほしい設問に付けます。画面に<strong>「要回答」</strong>の印が出ます。';
+        echo 'どの画面でも送信は止めません（来場者を途中で足止めしないため）。</span></span></label>';
     } else {
         echo '<label class="choice"><input type="checkbox" name="q[' . $index . '][required]" value="1"'
             . ($required ? ' checked' : '') . '><span>必須にする</span></label>';

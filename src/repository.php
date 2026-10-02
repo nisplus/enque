@@ -243,7 +243,7 @@ function common_survey_block(array $event, int $visitorId): ?array
         return null;
     }
 
-    return ['survey' => $survey, 'questions' => as_optional_questions($questions)];
+    return ['survey' => $survey, 'questions' => as_soft_required_questions($questions)];
 }
 
 /** その来場者が共通アンケートに答えているか */
@@ -252,6 +252,36 @@ function has_answered_overall(int $eventId, int $visitorId): bool
     $survey = overall_survey($eventId);
 
     return $survey !== null && has_response((int) $survey['id'], $visitorId);
+}
+
+/**
+ * 共通アンケートのうち、「要回答」なのにまだ書かれていない設問の数。
+ *
+ * 送信は止めない代わりに、回答済み画面でこの数を見せてお願いする。
+ */
+function unanswered_required_overall(int $eventId, int $visitorId): int
+{
+    $survey = overall_survey($eventId);
+    if ($survey === null || (int) $survey['is_published'] !== 1) {
+        return 0;
+    }
+
+    $questions = questions_for_survey((int) $survey['id']);
+    $response  = find_response((int) $survey['id'], $visitorId);
+    $values    = $response === null ? [] : response_values((int) $response['id'], $questions);
+
+    $left = 0;
+    foreach ($questions as $question) {
+        if ((int) $question['required'] !== 1) {
+            continue;
+        }
+        $value = $values[(int) $question['id']] ?? null;
+        if ($value === null || $value === '' || $value === []) {
+            $left++;
+        }
+    }
+
+    return $left;
 }
 
 /** イベントの共通設問テンプレート（type=template）。無ければ null */

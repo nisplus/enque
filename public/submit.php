@@ -82,7 +82,7 @@ if ((int) $survey['is_published'] !== 1 || $questions === []) {
 $type    = (string) $survey['type'];
 if ($type === 'overall') {
     // 総合アンケートはどの画面でも任意回答（代わりに、1問も書かずに送ることはできない）
-    $questions = as_optional_questions($questions);
+    $questions = as_soft_required_questions($questions);
 }
 $company = null;
 $invite  = null;

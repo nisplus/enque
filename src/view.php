@@ -118,9 +118,14 @@ function render_question(array $question, array $previous = [], bool $invalid = 
     echo '<div class="question" data-question="' . $id . '"' . ($invalid ? ' data-invalid="1"' : '') . '>';
     echo '<fieldset>';
     echo '<legend>' . e((string) $question['label']);
-    echo $required
-        ? '<span class="badge badge-required">必須</span>'
-        : '<span class="badge badge-optional">任意</span>';
+    if (is_soft_required($question)) {
+        // 総合アンケートの必須指定。送信は止めず、お帰りまでの回答をお願いする印
+        echo '<span class="badge badge-warn">要回答</span>';
+    } else {
+        echo $required
+            ? '<span class="badge badge-required">必須</span>'
+            : '<span class="badge badge-optional">任意</span>';
+    }
     echo '</legend>';
 
     switch ($type) {

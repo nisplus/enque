@@ -83,6 +83,10 @@ function render_survey_page(array $view): void
         echo '<p class="text-secondary">いまご記入いただいても、<strong>お帰りの前でも結構です。</strong>';
         echo '空欄のまま送信していただいても構いません（次の' . e(booth_label()) . 'の画面にも出ます）。';
         echo '<strong>送信後も、開催中であれば何度でも書き直せます。</strong></p>';
+        if (array_filter($common['questions'], 'is_soft_required') !== []) {
+            echo '<p class="text-secondary"><span class="badge badge-warn">要回答</span>';
+            echo ' の印が付いた設問は、<strong>お帰りまでにご回答をお願いします。</strong></p>';
+        }
         foreach ($common['questions'] as $question) {
             render_question($question, $view['previous'], in_array((int) $question['id'], $view['invalid'], true));
         }

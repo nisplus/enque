@@ -155,7 +155,12 @@ if ($overall !== null && (int) $overall['is_published'] === 1 && questions_for_s
     if ($overallOpen || $overallAnswered) {
         echo '<div class="card">';
         echo '<h2 style="margin-top:0">' . e(overall_label()) . '</h2>';
-        if ($overallAnswered) {
+        $left = $overallOpen ? unanswered_required_overall((int) $event['id'], (int) $visitor['id']) : 0;
+        if ($overallAnswered && $left > 0) {
+            // 送信は止めていないので、未回答の「要回答」はここでお願いする
+            echo '<p>ご回答ありがとうございました。<strong>まだ「要回答」の設問が' . $left . '問残っています。</strong>';
+            echo 'お帰りの前にご回答をお願いします。</p>';
+        } elseif ($overallAnswered) {
             echo '<p>ご回答ありがとうございました。';
             echo $overallOpen ? '内容はお帰りまで何度でも直せます。</p>' : '</p>';
         } else {
@@ -163,9 +168,9 @@ if ($overall !== null && (int) $overall['is_published'] === 1 && questions_for_s
             echo e(booth_label()) . 'のアンケート画面からでも、この画面からでもご回答いただけます。</p>';
         }
         if ($overallOpen) {
-            echo '<div class="btn-row"><a class="btn' . ($overallAnswered ? '' : ' btn-primary')
-                . '" href="/o.php?e=' . rawurlencode($eventSlug) . '">'
-                . ($overallAnswered ? '回答を変更する' : '回答する') . '</a></div>';
+            $label = !$overallAnswered ? '回答する' : ($left > 0 ? '回答を仕上げる' : '回答を変更する');
+            echo '<div class="btn-row"><a class="btn' . ($overallAnswered && $left === 0 ? '' : ' btn-primary')
+                . '" href="/o.php?e=' . rawurlencode($eventSlug) . '">' . $label . '</a></div>';
         }
         echo '</div>';
     }
