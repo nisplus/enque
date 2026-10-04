@@ -14,6 +14,8 @@ declare(strict_types=1);
  *   --prepare  送信対象（overall_invites）を先に作成・更新する
  *   --dry-run  送信せず、対象件数だけを表示する
  *
+ * .env の COLLECT_EMAIL=0（メールアドレスを集めない運用）のときは、何もせずに終了する。
+ *
  * cron 例（5分おきに200件ずつ送る）：
  *   *\/5 * * * * cd /var/www/enque && php bin/send_overall_invites.php --prepare >> logs/invites.log 2>&1
  */
@@ -65,6 +67,13 @@ if ($eventIds === []) {
 $log = static function (string $message): void {
     echo date('Y-m-d H:i:s') . ' ' . $message . "\n";
 };
+
+// メールアドレスを集めない設定のときは、何もせずに終わる。
+// 以前に預かったアドレスが残っていても、cron が勝手に送らないようにするため。
+if (!collect_email()) {
+    $log('メールアドレスの収集が無効（.env の COLLECT_EMAIL=0）のため、送信しません。');
+    exit(0);
+}
 
 foreach ($eventIds as $eventId) {
     $event = find_event($eventId);

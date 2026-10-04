@@ -42,8 +42,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         }
         flash_set('error', '共通設問テンプレートはすでに作成されています。');
     } elseif ($action === 'prepare') {
-        $added = create_pending_invites($eventId);
-        flash_set('success', '案内メールの送信対象を' . $added . '件追加しました。');
+        if (!collect_email()) {
+            flash_set('error', 'メールアドレスの収集が無効（.env の COLLECT_EMAIL=0）のため、送信対象は作成しません。');
+        } else {
+            $added = create_pending_invites($eventId);
+            flash_set('success', '案内メールの送信対象を' . $added . '件追加しました。');
+        }
     } elseif ($action === 'send_batch') {
         try {
             $result = send_pending_invites($eventId, 50);
@@ -96,7 +100,9 @@ echo '<p class="muted">' . e((string) $event['name']) . '（' . e(event_status_l
 
 if (!collect_email()) {
     echo '<div class="alert alert-warn">メールアドレスの収集が<strong>無効</strong>です（.env の <code class="mono">COLLECT_EMAIL=0</code>）。';
-    echo '来場者の画面に入力欄が出ないため、新しい宛先は増えません。案内メールを送るには、設定を戻してください。</div>';
+    echo '来場者の画面に入力欄が出ないうえ、<strong>案内メールも送信しません</strong>';
+    echo '（以前に預かったアドレスが残っていても、状態を「終了」にして自動送信されることはありません）。<br>';
+    echo '送れるようにするには <code class="mono">COLLECT_EMAIL=1</code> に戻してください。</div>';
 }
 
 if (mail_is_configured()) {

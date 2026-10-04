@@ -21,6 +21,7 @@ if (PHP_SAPI !== 'cli') {
 require_once dirname(__DIR__) . '/src/bootstrap.php';
 require_once dirname(__DIR__) . '/src/invites.php';
 require_once dirname(__DIR__) . '/src/insights.php';
+require_once dirname(__DIR__) . '/src/view.php';  // 画面の表記（状態ラベルなど）も確かめるため
 
 $argvValues = array_slice($argv, 1);
 $force      = in_array('--force', $argvValues, true);
@@ -828,6 +829,17 @@ check('test mail is written to the dry-run log', str_contains($logBody, $testMai
 // ログは追記されるので、今回のイベント固有のURLで確認する（古い行で通らないように）
 check('the dry-run log holds the preview link', str_contains($logBody, '/o/preview-' . $eventId));
 check('the test mail says it is a test', str_contains($logBody, 'テスト送信'));
+
+// メールアドレスを集めない設定のときは、送信スクリプトが何もしない
+// （以前に預かったアドレスが残っていても、状態を「終了」にしただけで送られないこと）
+putenv('COLLECT_EMAIL=0');
+$sender = project_root() . '/bin/send_overall_invites.php';
+$out = (string) @shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($sender)
+    . ' --event=' . $eventId . ' --prepare 2>&1');
+putenv('COLLECT_EMAIL');
+check('the sender stops when collecting is off', str_contains($out, '送信しません'), trim($out));
+check('the closed状態 label follows the setting',
+    event_status_label('closed') === (collect_email() ? '終了（案内メール送付）' : '終了（回答締切）'));
 
 // メッセージの組み立て（postfix に渡す内容とSMTPで送る内容は同じ）
 $message = build_mail_message('no-reply@example.jp', 'イベント事務局', 'to@example.jp', '件名テスト', "本文\n2行目");

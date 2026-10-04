@@ -70,7 +70,8 @@ function event_status_label(string $status): string
     return match ($status) {
         'draft'  => '準備中',
         'open'   => '開催中（回答受付）',
-        'closed' => '終了（案内メール送付）',
+        // メールを集めない運用では案内メールを送らないので、言い方を変える
+        'closed' => collect_email() ? '終了（案内メール送付）' : '終了（回答締切）',
         default  => $status,
     };
 }

@@ -90,6 +90,15 @@ function send_pending_invites(int $eventId, int $limit = 100, ?callable $log = n
         throw new RuntimeException('イベントが見つかりません：' . $eventId);
     }
 
+    // メールアドレスを集めない設定のときは送らない。
+    // 以前に預かったアドレスが残っていると、状態を「終了」にしただけで
+    // cron が自動送信してしまうため、ここで止める。
+    if (!collect_email()) {
+        throw new RuntimeException(
+            'メールアドレスの収集が無効（.env の COLLECT_EMAIL=0）のため、案内メールは送信しません。'
+        );
+    }
+
     $survey = overall_survey($eventId);
     if ($survey === null || (int) $survey['is_published'] !== 1) {
         throw new RuntimeException('総合アンケートが公開されていません。先に公開してください。');
