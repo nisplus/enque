@@ -25,6 +25,7 @@ if ($company === null || (int) $company['is_active'] !== 1) {
 }
 
 $survey    = survey_for_company((int) $company['id']);
+$surveyId  = $survey === null ? 0 : (int) $survey['id'];
 $questions = $survey === null ? [] : questions_for_survey((int) $survey['id']);
 $status    = (string) $event['status'];
 
@@ -51,13 +52,18 @@ if (!$available) {
 // 回答画面を開いた時点で来場者セッション（Cookie）を用意する
 $visitor = current_visitor((int) $event['id']);
 
+// 同じ企業に回答済みなら、前回の内容を出して書き直せるようにする。
+// 読み直すたびに新しい回答が増えると、集計では最初のぶんだけが使われて
+// 「直したのに反映されない」状態になるため、ここで上書きに寄せる。
+$answered = find_response($surveyId, (int) $visitor['id']);
+$previous = $answered === null ? [] : response_values((int) $answered['id'], $questions);
+
 // 2社目以降は、前の企業で答えた来場人数を初期値として入れておく
 // （毎回入力してもらわずに済み、未回答が減って集計の精度も上がる）
-$previous  = [];
 $partySize = visitor_party_size((int) $visitor['id']);
 if ($partySize !== null) {
     foreach ($questions as $question) {
-        if (is_party_size_question($question)) {
+        if (is_party_size_question($question) && !isset($previous[(int) $question['id']])) {
             $previous[(int) $question['id']] = (string) $partySize;
         }
     }
@@ -75,6 +81,7 @@ render_survey_page([
     'ask_email'   => true,
     'email_known' => ($visitor['email'] ?? null) !== null,
     'previous'    => $previous,
+    'answered'    => $answered !== null,
     'invalid'     => [],
     'error'       => submit_error_message(get_string('err')),
     'email_value' => (string) ($visitor['email'] ?? ''),

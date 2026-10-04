@@ -16,6 +16,7 @@ require_once __DIR__ . '/view.php';
  *   survey: array<string,mixed>,
  *   questions: list<array<string,mixed>>,
  *   hidden: array<string,string>,
+ *   answered?: bool,
  *   ask_email: bool,
  *   email_known?: bool,
  *   common?: array{survey: array<string,mixed>, questions: list<array<string,mixed>>}|null,
@@ -54,6 +55,14 @@ function render_survey_page(array $view): void
     if ($preview) {
         echo '<div class="alert alert-warn">スタッフ確認用のプレビューです。';
         echo 'この画面からは送信できません（回答は保存されません）。</div>';
+    }
+
+    // 同じ企業に回答済みの人には、前回の内容を出していることを伝える
+    $answered = ($view['answered'] ?? false) === true;
+    if ($answered) {
+        echo '<div class="alert alert-info">この' . e(booth_label()) . 'には<strong>ご回答済みです。</strong>';
+        echo '前回の内容を表示しています。直したいところがあれば書き換えて送信してください';
+        echo '（<strong>前回の回答は置き換わります</strong>）。</div>';
     }
 
     // 共通アンケートを混ぜるときは、設問数（進捗の分母）もあわせて数える
@@ -116,7 +125,9 @@ function render_survey_page(array $view): void
         echo '<button type="button" class="btn btn-block" disabled aria-disabled="true">'
             . 'プレビューのため送信できません</button>';
     } else {
-        echo '<button type="submit" class="btn btn-primary btn-block" data-submit data-label="回答を送信する">回答を送信する</button>';
+        $label = $answered ? '回答を変更する' : '回答を送信する';
+        echo '<button type="submit" class="btn btn-primary btn-block" data-submit data-label="' . e($label) . '">'
+            . e($label) . '</button>';
     }
     echo '</div>';
     if ($view['footer_note'] !== null) {

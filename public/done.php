@@ -122,6 +122,9 @@ $pageUrl = base_url() . '/done.php?e=' . rawurlencode($eventSlug) . '&c=' . rawu
 page_header('回答ありがとうございました｜' . (string) $event['name'], ['brand' => (string) $event['name']]);
 
 echo '<h1>ご回答ありがとうございました</h1>';
+if ((get_string('ok') ?? '') === 'updated') {
+    echo '<div class="alert alert-success">回答を変更しました。</div>';
+}
 echo '<div class="card">';
 echo '<p class="center text-secondary">総合受付でこの画面（またはスクリーンショット）をご提示ください。</p>';
 echo '<p class="claim-code">' . e($code) . '</p>';

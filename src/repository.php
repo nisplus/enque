@@ -533,6 +533,15 @@ function insert_response(int $surveyId, int $visitorId, array $answers): array
     });
 }
 
+/** あとから書き換えられた回答の数（1アンケートぶん） */
+function count_edited_responses(int $surveyId): int
+{
+    $stmt = db()->prepare('SELECT COUNT(*) FROM responses WHERE survey_id = ? AND updated_at IS NOT NULL');
+    $stmt->execute([$surveyId]);
+
+    return (int) $stmt->fetchColumn();
+}
+
 /** 有効回答数（重複を除く） */
 function count_responses(int $surveyId, bool $includeDuplicates = false): int
 {
@@ -654,6 +663,9 @@ function response_values(int $responseId, array $questions): array
 function replace_response_answers(int $responseId, array $answers): void
 {
     db_transaction(static function () use ($responseId, $answers): void {
+        $touch = db()->prepare('UPDATE responses SET updated_at = NOW() WHERE id = ?');
+        $touch->execute([$responseId]);
+
         $delete = db()->prepare('DELETE FROM answers WHERE response_id = ?');
         $delete->execute([$responseId]);
 

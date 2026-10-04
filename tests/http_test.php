@@ -275,16 +275,38 @@ $emailStmt = db()->prepare('SELECT COUNT(*) FROM visitors WHERE event_id = ? AND
 $emailStmt->execute([$eventId]);
 check('optional email is saved', (int) $emailStmt->fetchColumn() === 1);
 
-// 2回目の送信（同じ端末・同じ企業）
+$firstSubmittedAt = (string) db()->query(
+    'SELECT submitted_at FROM responses WHERE survey_id = ' . (int) $surveyAId . ' ORDER BY id LIMIT 1'
+)->fetchColumn();
+
+// 同じ企業をもう一度開くと、前回の回答が入った状態で出る
+$res = request('GET', $surveyPath, null, 'visitor');
+check('the form says the booth is already answered', str_contains($res['body'], 'ご回答済みです'));
+check('the previous answer is filled in', str_contains($res['body'], 'value="情報収集" checked'));
+check('the button offers to change the answer', str_contains($res['body'], '回答を変更する'));
+
+// 2回目の送信（同じ端末・同じ企業）は、新しい回答を作らずに書き換える
 $res = request('POST', '/submit.php', [
     'survey_id'          => (string) $surveyAId,
     'q[' . $qSingle . ']' => '就職活動',
 ], 'visitor', ['Accept: application/json']);
 $json = json_decode($res['body'], true);
 check('resubmission is accepted (not blocked)', $res['status'] === 200 && ($json['ok'] ?? false) === true);
-check('resubmission is flagged as duplicate', ($json['duplicate'] ?? false) === true);
-check('duplicate is excluded from the count', count_responses($surveyAId) === 1);
-check('duplicate is counted separately', count_duplicate_responses($surveyAId) === 1);
+check('resubmission does not add another response', count_responses($surveyAId) === 1);
+check('resubmission does not create a duplicate row', count_duplicate_responses($surveyAId) === 0);
+check('the edit is counted', count_edited_responses($surveyAId) === 1);
+
+$changed = db()->prepare('SELECT a.value FROM answers a JOIN responses r ON r.id = a.response_id
+                          WHERE r.survey_id = ? AND a.question_id = ?');
+$changed->execute([$surveyAId, $qSingle]);
+check('the new answer replaces the old one', (string) $changed->fetchColumn() === '就職活動');
+
+$times = db()->prepare('SELECT submitted_at, updated_at FROM responses WHERE survey_id = ? LIMIT 1');
+$times->execute([$surveyAId]);
+$row = $times->fetch();
+check('the first submission time is kept and the edit time is recorded',
+    (string) $row['submitted_at'] === $firstSubmittedAt && $row['updated_at'] !== null,
+    'submitted=' . (string) $row['submitted_at'] . ' first=' . $firstSubmittedAt);
 
 // 別の端末（別のCookie）からの回答
 $res = request('POST', '/submit.php', [

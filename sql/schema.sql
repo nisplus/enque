@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS responses (
   visitor_id   INT UNSIGNED NOT NULL,
   is_duplicate TINYINT(1) NOT NULL DEFAULT 0,
   submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- あとから書き換えたときの日時（NULL なら一度も修正していない）
+  updated_at   DATETIME NULL,
   INDEX idx_response_survey (survey_id, is_duplicate, submitted_at),
   INDEX idx_response_visitor (visitor_id),
   CONSTRAINT fk_response_survey  FOREIGN KEY (survey_id)  REFERENCES surveys(id)  ON DELETE CASCADE,

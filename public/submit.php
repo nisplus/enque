@@ -144,6 +144,7 @@ $view = [
         ? ['survey_id' => (string) $survey['id'], 't' => (string) ($invite['token'] ?? '')]
         : ['survey_id' => (string) $survey['id']],
     'ask_email'   => $type === 'company',
+    'answered'    => find_response($surveyId, (int) $visitor['id']) !== null,
     'email_known' => ($visitor['email'] ?? null) !== null,
     'previous'    => $previous,
     'invalid'     => [],
@@ -207,15 +208,13 @@ try {
         set_visitor_email((int) $visitor['id'], $emailInput);
     }
 
-    if ($type === 'overall') {
-        // 書き直しのときは、回答の行はそのままに中身だけ入れ替える
-        $existing = find_response($surveyId, (int) $visitor['id']);
-        if ($existing !== null) {
-            replace_response_answers((int) $existing['id'], $answers);
-            $result = ['response_id' => (int) $existing['id'], 'is_duplicate' => false];
-        } else {
-            $result = insert_response($surveyId, (int) $visitor['id'], $answers);
-        }
+    // 同じアンケートに回答済みなら、新しい行を作らず中身を入れ替える。
+    // 回答日時（周回時間・順番の集計に使う）は最初のまま残す。
+    $existing = find_response($surveyId, (int) $visitor['id']);
+    $edited   = $existing !== null;
+    if ($edited) {
+        replace_response_answers((int) $existing['id'], $answers);
+        $result = ['response_id' => (int) $existing['id'], 'is_duplicate' => false];
     } else {
         $result = insert_response($surveyId, (int) $visitor['id'], $answers);
     }
@@ -232,7 +231,8 @@ try {
         // ブックマーク・スクリーンショットのURLから同じ画面に戻れる。
         $claim    = find_or_create_claim((int) $visitor['id']);
         $redirect = '/done.php?e=' . rawurlencode((string) $event['slug'])
-            . '&c=' . rawurlencode((string) $claim['claim_code']);
+            . '&c=' . rawurlencode((string) $claim['claim_code'])
+            . ($edited ? '&ok=updated' : '');
     } elseif ($token === '') {
         // 会期中の回答・修正は、回答済み画面に戻して結果を知らせる
         $claim    = find_or_create_claim((int) $visitor['id']);

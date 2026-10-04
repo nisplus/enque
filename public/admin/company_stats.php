@@ -27,11 +27,12 @@ echo '<h1>' . e((string) $company['name']) . ' の集計</h1>';
 echo '<p class="muted">' . e((string) ($event['name'] ?? '')) . '</p>';
 
 $responses  = count_responses($surveyId, $includeDuplicates);
+$edited     = count_edited_responses($surveyId);
 $duplicates = count_duplicate_responses($surveyId);
 
 echo '<div class="stat-grid">';
 render_stat('回答数', count_label($responses), $includeDuplicates ? '重複を含む' : '重複を除く');
-render_stat('重複送信', count_label($duplicates), '同じ端末からの再送信');
+render_stat('修正された回答', count_label($edited), '来場者があとから書き直したぶん');
 render_stat('設問数', count_label(count($questions), '問'));
 echo '</div>';
 

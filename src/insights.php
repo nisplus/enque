@@ -9,7 +9,7 @@ require_once __DIR__ . '/repository.php';
  *
  * 数え方の前提（画面にも注記する）：
  *   - 来場者は端末の匿名Cookie単位。端末を変えた人は別人として数える
- *   - 重複送信（同じ企業への2回目以降）は数えない
+ *   - 同じ企業への2回目の送信は書き換えになる（行は増えない）。古いデータの重複は数えない
  *   - 「周回時間」は最初の回答から最後の回答までの間隔であって、滞在時間ではない
  *   - 1社しか回っていない人は周回時間が0になるため、時間の統計からは除く
  */
@@ -360,28 +360,29 @@ function satisfaction_by_lap_count(int $eventId, array $laps): array
 /**
  * 回答・登録まわりの割合。
  *
- * @return array{opened: int, responded: int, response_rate: float, duplicate_rate: float,
- *               email_rate: float, overall_rate: float, claim_rate: float}
+ * @return array{opened: int, responded: int, response_rate: float, edited_rate: float,
+ *               email_rate: float, overall_rate: float, edited_rate: float, claim_rate: float}
  */
 function participation_rates(int $eventId): array
 {
     $summary = event_summary($eventId);
     $invites = invite_stats($eventId);
 
+    // 来場者があとから書き直した回答の割合（同じ端末からの書き換え）
     $stmt = db()->prepare(
-        "SELECT COALESCE(SUM(r.is_duplicate = 1), 0) AS dup, COUNT(*) AS total
+        "SELECT COALESCE(SUM(r.updated_at IS NOT NULL), 0) AS edited, COUNT(*) AS total
          FROM responses r JOIN surveys s ON s.id = r.survey_id
-         WHERE s.event_id = ? AND s.type = 'company'"
+         WHERE s.event_id = ? AND s.type = 'company' AND r.is_duplicate = 0"
     );
     $stmt->execute([$eventId]);
-    $row = $stmt->fetch() ?: ['dup' => 0, 'total' => 0];
+    $row = $stmt->fetch() ?: ['edited' => 0, 'total' => 0];
 
     return [
         'opened'         => $summary['visitors'],
         'responded'      => $summary['responding_visitors'],
         // アンケート画面を開いた端末のうち、実際に送信した割合
         'response_rate'  => percentage($summary['responding_visitors'], $summary['visitors']),
-        'duplicate_rate' => percentage((int) $row['dup'], (int) $row['total']),
+        'edited_rate'    => percentage((int) $row['edited'], (int) $row['total']),
         'email_rate'     => percentage($summary['emails'], $summary['responding_visitors']),
         // 回答した来場者のうち、共通アンケートにも答えた割合。
         // 会期中にブースのアンケートへ混ぜて集めるため、分母は案内メールではなく回答者。

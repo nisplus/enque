@@ -43,11 +43,11 @@ if ($role === 'company') {
     }
 
     $responses  = count_responses($surveyId);
-    $duplicates = count_duplicate_responses($surveyId);
+    $edited     = count_edited_responses($surveyId);
 
     echo '<div class="stat-grid">';
     render_stat('回答数', count_label($responses), '重複を除く');
-    render_stat('重複送信', count_label($duplicates), '同じ端末からの再送信');
+    render_stat('修正された回答', count_label($edited), '来場者があとから書き直したぶん');
     render_stat('設問数', count_label(count($questions), '問'));
     echo '</div>';
 

@@ -225,6 +225,7 @@ mysql -u root -p enque -e "SHOW TABLES; SHOW COLUMNS FROM prize_claims;"
 | `sql/migrate_party_size.sql` | 設問の種類に「数値入力」を追加し、`questions.metric`（来場人数として集計するか）を追加 | 来場人数の集計より前に `sql/schema.sql` でDBを作った場合 |
 | `sql/migrate_common_survey.sql` | `events.common_survey_from`（総合アンケートを何社目のブースから出すか）を追加 | 総合アンケートを会期中に集める版より前に `sql/schema.sql` でDBを作った場合 |
 | `sql/migrate_share_and_login.sql` | `events.share_token`（URL一覧の共有リンク）と `admin_users.last_login_at`（最終ログイン）を追加 | URL一覧の共有・最終ログイン表示より前に `sql/schema.sql` でDBを作った場合 |
+| `sql/migrate_response_edit.sql` | `responses.updated_at`（あとから書き直した日時）を追加 | 回答の書き直しより前に `sql/schema.sql` でDBを作った場合 |
 
 - **新規に構築する場合は `sql/schema.sql` だけで足ります**（マイグレーションは不要です）。
 - マイグレーションは `IF NOT EXISTS` で書いてあるので、**二度流しても壊れません**。
@@ -420,7 +421,7 @@ C:\xampp\php\php.exe bin\seed_traffic.php --force --visitors=200
 ```
 C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（80項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（325項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（330項目）
 node tests\scan_test.js                                   REM QR読み取り判定（27項目・Nodeがある場合のみ）
 ```
 
@@ -563,9 +564,11 @@ PHPの組み込みサーバーは逐次処理のため、**必ず Apache + php-f
 - **終了後のメールは壁紙のご案内です。** 会期中に答えた方には壁紙のURLだけを送り、まだ答えていない方には
   これまでどおり回答のお願いを送って、回答後に壁紙へ進んでもらいます（文面は送信時に出し分けます）。
   壁紙はメール限定のままにしています。メールアドレスをお預かりする動機が壁紙のためです。
-- **企業アンケートの重複送信は拒否しません。** 同じ端末から同じ企業へ再送信された場合も
-  通常どおり受け付け、`responses.is_duplicate` を立てて集計から除きます。
-  画面には「再送信できます」とは表示していません（仕様どおり）。
+- **同じ企業のQRを読み直すと、前回の回答を出して書き直せます。** 「この企業にはご回答済みです」と伝え、
+  前回の内容を埋めた状態で表示し、送信すると**同じ回答行の中身を入れ替えます**（新しい行は作りません）。
+  読み直すたびに回答が増えると、集計では最初のぶんだけが使われて「直したのに反映されない」ためです。
+  回答日時は最初のまま残し、書き換えた時刻は `responses.updated_at` に記録して「修正された回答」として
+  数えます。`responses.is_duplicate` は、この仕組みより前に記録された重複のために残しています。
 - **景品交換は来場者側に拒否を表示しません。** 交換済みかどうかは受付の照会画面にだけ表示し、
   対応はスタッフの判断に委ねます。交換履歴（日時・対応者・メモ）を残します。
 - **来場者の同定は端末の匿名Cookieだけで、メールアドレスは必須にしていません。**
