@@ -151,7 +151,16 @@ function random_claim_code(): string
 /** 入力された交換コードを正規化する（小文字・空白・区切りの揺れを吸収） */
 function normalize_claim_code(string $input): string
 {
-    $upper = strtoupper(trim_ja($input));
+    $value = trim_ja($input);
+
+    // USBバーコードリーダーはQRの中身（URL）をそのまま打ち込むので、URLからコードを取り出す
+    if (preg_match('#/c/([0-9A-Za-z-]+)#', $value, $m) === 1) {
+        $value = $m[1];
+    } elseif (preg_match('#[?&]code=([0-9A-Za-z%-]+)#', $value, $m) === 1) {
+        $value = urldecode($m[1]);
+    }
+
+    $upper = strtoupper($value);
     $upper = (string) preg_replace('/[^0-9A-Z]/', '', $upper);
     if (strlen($upper) !== 8) {
         return $upper;

@@ -226,6 +226,13 @@ echo "=== helpers ===\n";
 
 check('escaping covers quotes', e('<a href="x">&</a>') === '&lt;a href=&quot;x&quot;&gt;&amp;&lt;/a&gt;');
 check('full-width spaces are trimmed', trim_ja('　あ　') === 'あ');
+// バーコードリーダーはQRの中身（URL）をそのまま打ち込む
+check('a scanned url yields the code',
+    normalize_claim_code('https://survey.example.jp/c/ABCD-2345') === 'ABCD-2345');
+check('the query string form of the url also works',
+    normalize_claim_code('https://survey.example.jp/c.php?code=ABCD-2345') === 'ABCD-2345');
+check('a bare code still works', normalize_claim_code(' abcd2345 ') === 'ABCD-2345');
+
 check('email validation accepts a normal address', is_valid_email('user@example.jp'));
 check('email validation rejects a broken address', !is_valid_email('user@@example'));
 

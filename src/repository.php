@@ -1018,6 +1018,22 @@ function mark_claimed(int $claimId, string $staff, ?string $note, ?int $prizeId 
     return $stmt->rowCount() === 1;
 }
 
+/**
+ * 交換済みの記録を取り消す（受付が読み取りを間違えたときに戻すため）。
+ *
+ * 記録を消すだけなので、戻したあとはもう一度読み取れば交換できる。
+ */
+function unmark_claimed(int $claimId): bool
+{
+    $stmt = db()->prepare(
+        'UPDATE prize_claims SET claimed_at = NULL, claimed_by = NULL, prize_id = NULL, note = NULL
+         WHERE id = ? AND claimed_at IS NOT NULL'
+    );
+    $stmt->execute([$claimId]);
+
+    return $stmt->rowCount() === 1;
+}
+
 /** @return list<array<string,mixed>> 交換履歴（新しい順） */
 function claim_history(int $eventId, int $limit = 100): array
 {

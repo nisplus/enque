@@ -601,7 +601,9 @@ check('reception scanning the qr goes straight to the lookup',
 $res = request('GET', '/admin/claim.php?code=' . rawurlencode($claimCode), null, 'rcp');
 check('reception can look up a claim code', $res['status'] === 200 && str_contains($res['body'], $claimCode));
 check('unclaimed code is shown as not yet exchanged', str_contains($res['body'], '未交換'));
-check('the lookup page explains the qr scan', str_contains($res['body'], 'カメラで読み取る'));
+check('the lookup page explains the reader flow',
+    str_contains($res['body'], 'バーコードリーダーで来場者のQRコードを読み取ってください'));
+check('the lookup page still offers the phone camera', str_contains($res['body'], 'カメラでQRコードを読み取る'));
 check('the lookup page has the scan button and camera panel',
     str_contains($res['body'], 'id="scan-open"') && str_contains($res['body'], 'id="scan-video"'));
 check('the lookup page loads the scanner scripts',
@@ -689,6 +691,74 @@ if ($claim2Row !== null) {
     check('handing out past the quantity is recorded as an overage',
         $stock[0]['remaining'] === 0 && $stock[0]['over'] === 1 && $stock[0]['claimed'] === 3);
 }
+
+echo "=== reception scanning ===
+";
+
+// バーコードリーダー運用：読み取り欄にURLごと打ち込まれても、1回で交換済みにできる
+$scanVisitor = find_or_create_visitor($eventId, str_repeat('c', 64));
+$scanClaimRow = find_or_create_claim((int) $scanVisitor['id']);
+$scanCode     = (string) $scanClaimRow['claim_code'];
+
+$res = request('GET', '/admin/claim.php', null, 'rcp');
+check('the lookup field is focused for the reader', str_contains($res['body'], 'autofocus'));
+check('the scan form posts to the same screen', str_contains($res['body'], 'value="scan"'));
+check('the reception helper script is loaded', str_contains($res['body'], '/assets/reception.js'));
+$token = csrf_from($res['body']);
+
+$res = request('POST', '/admin/claim.php', [
+    'csrf_token' => $token,
+    'action'     => 'scan',
+    'code'       => claim_url($scanCode),   // QRの中身（URL）をそのまま読み取る
+    'prize_id'   => (string) $prizeBId,
+    'auto'       => '1',
+], 'rcp');
+check('scanning the url records the exchange in one step', $res['status'] === 302, 'status=' . $res['status']);
+check('the screen offers to undo what was just recorded',
+    str_contains((string) $res['location'], 'undo=' . $scanCode), 'location=' . (string) $res['location']);
+
+$scanned = find_claim_by_code($scanCode);
+check('the exchange is stored with the chosen prize',
+    ($scanned['claimed_at'] ?? null) !== null && (int) $scanned['prize_id'] === $prizeBId);
+
+// 同じコードをもう一度読み取っても、記録は書き換えない
+$res = request('GET', '/admin/claim.php?undo=' . rawurlencode($scanCode), null, 'rcp');
+check('the undo button is offered', str_contains($res['body'], '直前の記録を取り消す'));
+$token = csrf_from($res['body']);
+$res = request('POST', '/admin/claim.php', [
+    'csrf_token' => $token, 'action' => 'scan', 'code' => $scanCode,
+    'prize_id' => (string) $prizeAId, 'auto' => '1',
+], 'rcp');
+$again = find_claim_by_code($scanCode);
+check('a second scan does not change the record', (int) $again['prize_id'] === $prizeBId);
+
+$res = request('GET', '/admin/claim.php?code=' . rawurlencode($scanCode), null, 'rcp');
+check('the second scan is reported as already claimed', str_contains($res['body'], 'すでに交換済みです'));
+
+// 読み取り間違いは取り消せる
+$token = csrf_from($res['body']);
+$res = request('POST', '/admin/claim.php', [
+    'csrf_token' => $token, 'action' => 'undo', 'code' => $scanCode,
+], 'rcp');
+check('the last record can be undone', $res['status'] === 302
+    && (find_claim_by_code($scanCode)['claimed_at'] ?? null) === null, 'status=' . $res['status']);
+
+// 自動記録を外したときは、読み取っても記録しない
+$res = request('GET', '/admin/claim.php', null, 'rcp');
+$res = request('POST', '/admin/claim.php', [
+    'csrf_token' => csrf_from($res['body']), 'action' => 'scan',
+    'code' => $scanCode, 'prize_id' => (string) $prizeBId,
+], 'rcp');
+check('with auto off the scan only looks it up',
+    (find_claim_by_code($scanCode)['claimed_at'] ?? null) === null, 'status=' . $res['status']);
+
+// 読み取れなかった文字列は、そうと分かるように返す
+$res = request('GET', '/admin/claim.php', null, 'rcp');
+$res = request('POST', '/admin/claim.php', [
+    'csrf_token' => csrf_from($res['body']), 'action' => 'scan', 'code' => 'NOSUCHCODE', 'auto' => '1',
+], 'rcp');
+$res = request('GET', '/admin/claim.php', null, 'rcp');
+check('an unreadable code is reported', str_contains($res['body'], '交換コードが見つかりません'));
 
 // 来場者側には「交換済み」と表示しない（コード付きURLで開いた場合も同じ）
 $res = done_page();

@@ -55,7 +55,7 @@ enque/
 │   ├── wallpaper.php           壁紙ダウンロード画面
 │   ├── wallpaper_file.php      壁紙の配信（回答済みトークンのみ）
 │   ├── urls.php                アンケートURLの一覧（スタッフ共有用・ログイン不要）
-│   ├── assets/                 style.css / app.js / scan.js（受付のQR読み取り）
+│   ├── assets/                 style.css / app.js / scan.js（QR読み取り）/ copy.js / reception.js（受付の読み取り補助）
 │   │   └── vendor/             jsqr.min.js（QRデコーダ, Apache-2.0）とライセンス全文
 │   └── admin/
 │       ├── setup.php           初回の主催者アカウント作成
@@ -419,9 +419,9 @@ C:\xampp\php\php.exe bin\seed_traffic.php --force --visitors=200
 ## テスト
 
 ```
-C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（80項目）
+C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（83項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（332項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（345項目）
 node tests\scan_test.js                                   REM QR読み取り判定（27項目・Nodeがある場合のみ）
 ```
 
@@ -537,6 +537,11 @@ PHPの組み込みサーバーは逐次処理のため、**必ず Apache + php-f
   漏れたときは管理画面から作り直せます（古いリンクは404になります）。検索避けに `noindex` を付けています。
   なお**開催中にアンケートを開くと、回答しなくてもユニーク来場者が1増えます**。画面とマニュアルで、
   動作確認は「準備中」のうちに行うよう案内しています。
+- **受付はUSBバーコードリーダーで「読み取るだけ」で終われます。** リーダーはQRの中身（URL）をキーボードとして
+  打ち込むので、照会画面の読み取り欄に常にカーソルを置き、読み取ったURLからコードを取り出して
+  （`normalize_claim_code`）、そのまま交換済みまで記録します。渡す景品は読み取る前に選んでおき（1種類なら
+  自動で選択）、選択と「そのまま交換済みにする」の設定は端末の localStorage に覚えます。読み間違いは
+  「直前の記録を取り消す」で戻せます（`unmark_claimed`）。確認だけしたいときはチェックを外します。
 - **総合受付には「交換コードを表示する」QRを1枚掲示します。** タブを閉じた来場者がブースを回り直さずに
   交換コードを出せるようにするためで、`/done.php?e=<イベント>&from=desk` を印刷します（`qr_print.php?desk=1`）。
   来場者ごとのQRではなく、端末のCookieで本人を判別するので1枚で全員に使えます。見つからないときは

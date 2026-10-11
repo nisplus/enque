@@ -306,6 +306,13 @@ details.card[open] > summary { margin-bottom: 8px; }
 .q-editor [hidden] { display: none; }
 .inline-form { display: inline; }
 
+/* 受付の読み取り欄（バーコードリーダーで読み取る） ---------------------------- */
+.scan-input {
+  font-size: 1.3rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .08em; text-align: center;
+}
+.scan-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
 /* QR読み取り（受付のスマホカメラ） -------------------------------------------- */
 .scan-view {
   position: relative;
