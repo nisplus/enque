@@ -1228,6 +1228,39 @@ check('the wallpaper opens for a visitor who answered in the booth',
 $res = request('GET', '/wallpaper_file.php?t=' . $commonToken . '&id=' . $wallpaperId, null, 'common1');
 check('the image is served for that visitor as well', $res['status'] === 200);
 
+echo "=== overall survey stats ===\n";
+
+// 総合アンケートの集計画面（企業にひも付かないので survey 指定で開く）
+$res = request('GET', '/admin/company_stats.php?survey=' . $overallId, null, 'org');
+check('the overall survey has its own stats page', $res['status'] === 200, 'status=' . $res['status']);
+check('the stats page is titled after the survey', str_contains($res['body'], overall_label() . 'の集計'));
+check('the stats page shows the questions', str_contains($res['body'], '設問別の集計'));
+check('the stats page shows the answer rate', str_contains($res['body'], '回答率'));
+check('the stats page relates answers to the number of booths',
+    str_contains($res['body'], '周回企業数との関係'));
+check('the stats page links to the csv', str_contains($res['body'], 'export_csv.php?survey=' . $overallId));
+
+// 入口（総合アンケートの画面とダッシュボード）から開ける
+$res = request('GET', '/admin/invites.php?event=' . $eventId, null, 'org');
+check('the overall survey screen links to its stats',
+    str_contains($res['body'], 'company_stats.php?survey=' . $overallId));
+
+$res = request('GET', '/admin/index.php?event=' . $eventId, null, 'org');
+check('the dashboard links to the overall stats too',
+    str_contains($res['body'], 'company_stats.php?survey=' . $overallId));
+
+// 企業担当者には見せない（全体のデータのため）
+$res = request('GET', '/admin/company_stats.php?survey=' . $overallId, null, 'co');
+check('a company user cannot open the overall stats', $res['status'] === 404, 'status=' . $res['status']);
+
+// 企業アンケートは survey 指定でも company 指定でも開ける
+$res = request('GET', '/admin/company_stats.php?survey=' . $surveyAId, null, 'org');
+check('a company survey can be opened by survey id',
+    $res['status'] === 200 && str_contains($res['body'], 'TEST CO A'), 'status=' . $res['status']);
+
+$res = request('GET', '/admin/company_stats.php?company=' . $companyAId, null, 'org');
+check('the company link still works', $res['status'] === 200);
+
 echo "=== visitor insights ===\n";
 
 // 集計の正しさを確かめるため、時刻まで決め打ちした回答を別イベントに作る

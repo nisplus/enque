@@ -268,6 +268,9 @@ echo '<p>案内メール：送信済み ' . $invites['sent'] . '件／未送信 
     . '件／失敗 ' . $invites['failed'] . '件／回答 ' . $invites['responded'] . '件</p>';
 echo '<p>共通設問テンプレート：' . ($template === null ? '未作成' : e((string) $template['title'])) . '</p>';
 echo '<div class="btn-row">';
+if ($overall !== null) {
+    echo '<a class="btn" href="company_stats.php?survey=' . (int) $overall['id'] . '">' . e(overall_label()) . 'の集計</a>';
+}
 echo '<a class="btn" href="invites.php?event=' . $eventId . '">' . e(overall_label()) . 'と案内メール</a>';
 echo '<a class="btn" href="wallpapers.php?event=' . $eventId . '">壁紙の登録</a>';
 echo '</div></div>';

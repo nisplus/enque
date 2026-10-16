@@ -63,7 +63,7 @@ enque/
 │       ├── index.php           ダッシュボード（主催者／企業担当）
 │       ├── companies.php       企業とQRの管理
 │       ├── survey_edit.php     設問の編集（企業・全体・共通テンプレート）
-│       ├── company_stats.php   1社の集計（グラフ）
+│       ├── company_stats.php   アンケートの集計（1社／総合アンケート。?company= と ?survey=）
 │       ├── insights.php        回答者傾向（周回時間・周回企業数・動線）
 │       ├── responses.php       回答一覧
 │       ├── export_csv.php      CSV（1社分／イベント全社分）
@@ -421,7 +421,7 @@ C:\xampp\php\php.exe bin\seed_traffic.php --force --visitors=200
 ```
 C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（83項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（345項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（356項目）
 node tests\scan_test.js                                   REM QR読み取り判定（27項目・Nodeがある場合のみ）
 ```
 
@@ -537,6 +537,9 @@ PHPの組み込みサーバーは逐次処理のため、**必ず Apache + php-f
   漏れたときは管理画面から作り直せます（古いリンクは404になります）。検索避けに `noindex` を付けています。
   なお**開催中にアンケートを開くと、回答しなくてもユニーク来場者が1増えます**。画面とマニュアルで、
   動作確認は「準備中」のうちに行うよう案内しています。
+- **総合アンケートの集計は、企業の集計と同じ画面（`company_stats.php`）を `?survey=` で開きます。** 設問ごとの
+  グラフを描く部分（`render_survey_stats`）をそのまま使い回せるためで、総合アンケートのときだけ回答率・
+  周回企業数との関係・来場人数との関係を足しています。関係の表は相関であって因果ではないと画面にも明記します。
 - **受付はUSBバーコードリーダーで「読み取るだけ」で終われます。** リーダーはQRの中身（URL）をキーボードとして
   打ち込むので、照会画面の読み取り欄に常にカーソルを置き、読み取ったURLからコードを取り出して
   （`normalize_claim_code`）、そのまま交換済みまで記録します。渡す景品は読み取る前に選んでおき（1種類なら

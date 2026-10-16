@@ -284,13 +284,14 @@ function hourly_unique_visitors(int $eventId): array
 /**
  * 周回企業数と評価の関係。
  *
- * 企業アンケートの評価（星）とNPSの回答を、その人が回った企業数の区分ごとに平均する。
+ * 評価（星）とNPSの回答を、その人が回った企業数の区分ごとに平均する。
+ * $surveyType で、企業アンケート（company）と総合アンケート（overall）を切り替える。
  * 相関であって因果ではない（たくさん回った人は元々関心が高い、という説明もつく）。
  *
  * @param list<array<string,mixed>> $laps
  * @return list<array{label: string, visitors: int, rating_avg: ?float, nps_score: ?int, answers: int}>
  */
-function satisfaction_by_lap_count(int $eventId, array $laps): array
+function satisfaction_by_lap_count(int $eventId, array $laps, string $surveyType = 'company'): array
 {
     $bucketOf = static function (int $companies): string {
         if ($companies <= 1) {
@@ -317,10 +318,10 @@ function satisfaction_by_lap_count(int $eventId, array $laps): array
          JOIN questions q ON q.id = a.question_id
          JOIN responses r ON r.id = a.response_id
          JOIN surveys s   ON s.id = r.survey_id
-         WHERE s.event_id = ? AND s.type = 'company' AND r.is_duplicate = 0
+         WHERE s.event_id = ? AND s.type = ? AND r.is_duplicate = 0
            AND q.type IN ('rating', 'nps') AND a.value IS NOT NULL"
     );
-    $stmt->execute([$eventId]);
+    $stmt->execute([$eventId, $surveyType]);
 
     $ratings = ['1社' => [], '2〜3社' => [], '4社以上' => []];
     $nps     = ['1社' => [], '2〜3社' => [], '4社以上' => []];
@@ -351,6 +352,75 @@ function satisfaction_by_lap_count(int $eventId, array $laps): array
                 : round(array_sum($ratings[$bucket]) / count($ratings[$bucket]), 2),
             'nps_score'  => $nps[$bucket] === [] ? null : nps_breakdown($npsCounts)['score'],
             'answers'    => count($ratings[$bucket]) + count($nps[$bucket]),
+        ];
+    }
+
+    return $rows;
+}
+
+/**
+ * 来場人数と評価の関係。
+ *
+ * 「何人で来られましたか」の回答で来場者を分け、星評価の平均を出す。
+ * 1人で来た方とグループで来た方で感じ方が違うか、の目安にする。
+ * 人数を答えていない方は数えない（推計で補うと読み違いのもとになるため）。
+ *
+ * @return list<array{label: string, visitors: int, rating_avg: ?float, answers: int}>
+ */
+function rating_by_party_size(int $eventId, string $surveyType = 'overall'): array
+{
+    // 来場者ごとの人数（複数回答えていれば小さいほうを使う）
+    $stmt = db()->prepare(
+        "SELECT r.visitor_id, MIN(CAST(a.value AS UNSIGNED)) AS party
+         FROM responses r
+         JOIN surveys s   ON s.id = r.survey_id
+         JOIN questions q ON q.survey_id = s.id AND q.metric = 'party_size'
+         JOIN answers a   ON a.response_id = r.id AND a.question_id = q.id
+         WHERE s.event_id = ? AND r.is_duplicate = 0 AND a.value IS NOT NULL
+         GROUP BY r.visitor_id"
+    );
+    $stmt->execute([$eventId]);
+
+    $bucketByVisitor = [];
+    $visitors        = ['1人' => 0, '2人' => 0, '3人以上' => 0];
+    foreach ($stmt->fetchAll() as $row) {
+        $party  = (int) $row['party'];
+        $bucket = $party <= 1 ? '1人' : ($party === 2 ? '2人' : '3人以上');
+        $bucketByVisitor[(int) $row['visitor_id']] = $bucket;
+        $visitors[$bucket]++;
+    }
+
+    if ($bucketByVisitor === []) {
+        return [];
+    }
+
+    $stmt = db()->prepare(
+        "SELECT r.visitor_id, a.value
+         FROM answers a
+         JOIN questions q ON q.id = a.question_id
+         JOIN responses r ON r.id = a.response_id
+         JOIN surveys s   ON s.id = r.survey_id
+         WHERE s.event_id = ? AND s.type = ? AND r.is_duplicate = 0
+           AND q.type = 'rating' AND a.value IS NOT NULL"
+    );
+    $stmt->execute([$eventId, $surveyType]);
+
+    $ratings = ['1人' => [], '2人' => [], '3人以上' => []];
+    foreach ($stmt->fetchAll() as $row) {
+        $bucket = $bucketByVisitor[(int) $row['visitor_id']] ?? null;
+        if ($bucket !== null) {
+            $ratings[$bucket][] = (int) $row['value'];
+        }
+    }
+
+    $rows = [];
+    foreach (['1人', '2人', '3人以上'] as $bucket) {
+        $values = $ratings[$bucket];
+        $rows[] = [
+            'label'      => $bucket,
+            'visitors'   => $visitors[$bucket],
+            'rating_avg' => $values === [] ? null : round(array_sum($values) / count($values), 2),
+            'answers'    => count($values),
         ];
     }
 

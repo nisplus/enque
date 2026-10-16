@@ -136,6 +136,7 @@ if ($overall === null) {
         . '（ダッシュボードの「イベント設定」で変更できます）</p>';
     echo '<div class="btn-row">';
     echo '<a class="btn" href="survey_edit.php?survey=' . (int) $overall['id'] . '">設問を編集する</a>';
+    echo '<a class="btn btn-primary" href="company_stats.php?survey=' . (int) $overall['id'] . '">集計を見る</a>';
     echo '<a class="btn" href="responses.php?survey=' . (int) $overall['id'] . '">回答一覧</a>';
     echo '<a class="btn" href="export_csv.php?survey=' . (int) $overall['id'] . '">CSV</a>';
     echo '</div>';
