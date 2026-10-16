@@ -10,6 +10,9 @@ declare(strict_types=1);
  * 総合アンケートは企業にひも付かないため、survey 指定でも開けるようにしている。
  * 総合アンケートのときは、全体の読み解きに役立つ集計（回答率・周回企業数との関係・
  * 来場人数との関係）もあわせて出す。
+ *
+ * 「グループの構成」は、区分ごとの人数を聞く設問（metric = group_member）が
+ * あるときだけ出す。総合アンケートに限らず、どのアンケートでも読める。
  */
 
 require_once dirname(__DIR__, 2) . '/src/bootstrap.php';
@@ -95,11 +98,96 @@ echo '<div class="card">' . svg_line_chart(responses_by_hour($surveyId)) . '</di
 echo '<h2>設問別の集計</h2>';
 render_survey_stats($surveyId, $questions, $includeDuplicates);
 
+// ---------------------------------------------------------------- グループの構成
+$eventId = (int) $survey['event_id'];
+$laps    = $responses > 0 ? visitor_laps($eventId) : [];
+$group   = $responses > 0
+    ? group_member_stats($eventId, $surveyId, $laps)
+    : ['configured' => false, 'groups' => 0];
+
+if ($group['configured'] && $group['groups'] > 0) {
+    echo '<h2>グループの構成</h2>';
+
+    echo '<div class="stat-grid">';
+    render_stat('内訳を答えたグループ', count_label($group['groups'], '組'),
+        '回答 ' . count_label($group['responses']) . 'の ' . $group['answer_rate'] . '%');
+    render_stat('内訳の合計人数', count_label($group['people'], '人'), 'のべ来場者には足していません');
+    render_stat('1組あたりの人数', $group['avg_size'] . '人', '内訳の合計の平均');
+    echo '</div>';
+
+    echo '<div class="card">';
+    echo '<h3 style="margin-top:0">区分別の人数</h3>';
+    echo '<div class="table-scroll"><table>';
+    echo '<thead><tr><th>区分</th><th class="num">合計人数</th><th class="num">構成比</th>'
+        . '<th class="num">いた組</th><th class="num">1組あたり</th></tr></thead><tbody>';
+    foreach ($group['categories'] as $row) {
+        echo '<tr><td>' . e($row['label']) . '</td>';
+        echo '<td class="num">' . count_label($row['people'], '人') . '</td>';
+        echo '<td class="num">' . $row['share'] . '%</td>';
+        echo '<td class="num">' . count_label($row['groups'], '組') . '（' . $row['group_share'] . '%）</td>';
+        echo '<td class="num">' . $row['avg'] . '人</td></tr>';
+    }
+    echo '</tbody></table></div>';
+    echo '<p class="muted">構成比は内訳の合計人数に対する割合です。';
+    echo '「いた組」はその区分が1人以上いた組の数（カッコ内は内訳を答えた組に対する割合）。</p>';
+    echo '</div>';
+
+    echo '<div class="card">';
+    echo '<h3 style="margin-top:0">よくあるグループの型</h3>';
+    echo '<div class="table-scroll"><table>';
+    echo '<thead><tr><th>型</th><th class="num">組数</th><th class="num">割合</th></tr></thead><tbody>';
+    foreach ($group['patterns'] as $row) {
+        echo '<tr><td>' . e($row['label']) . '</td>';
+        echo '<td class="num">' . count_label($row['groups'], '組') . '</td>';
+        echo '<td class="num">' . $row['share'] . '%</td></tr>';
+    }
+    echo '</tbody></table></div>';
+    echo '<p class="muted">0人の区分は書いていません。多い順に' . GROUP_PATTERN_LIMIT . '通りまで並べています。</p>';
+    echo '</div>';
+
+    if ($group['segments'] !== []) {
+        echo '<div class="card">';
+        echo '<h3 style="margin-top:0">区分ごとの傾向</h3>';
+        echo '<div class="table-scroll"><table>';
+        echo '<thead><tr><th>グループ</th><th class="num">組数</th><th class="num">平均周回企業数</th>'
+            . '<th class="num">平均評価</th></tr></thead><tbody>';
+        foreach ($group['segments'] as $row) {
+            echo '<tr><td>' . e($row['label']) . '</td>';
+            echo '<td class="num">' . count_label($row['groups'], '組') . '（' . $row['share'] . '%）</td>';
+            echo '<td class="num">' . ($row['laps_avg'] === null ? '—' : $row['laps_avg'] . '社') . '</td>';
+            echo '<td class="num">' . ($row['rating_avg'] === null ? '—' : $row['rating_avg'] . ' / ' . RATING_MAX) . '</td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table></div>';
+        echo '<p class="muted">「◯◯を含む」は重なって数えます（大人と小学生がいる組は両方の行に入ります）。';
+        echo '「◯◯のみ」はその区分だけの組で、' . GROUP_ONLY_MIN . '組以上あるときだけ出します。';
+        echo '差が出ても<strong>相関であって因果ではありません</strong>。</p>';
+        echo '</div>';
+    }
+
+    if ($group['check']['compared'] > 0) {
+        echo '<div class="card">';
+        echo '<h3 style="margin-top:0">来場人数との照合</h3>';
+        echo '<p>' . count_label($group['check']['compared'], '組') . '中'
+            . count_label($group['check']['matched'], '組')
+            . '（' . $group['check']['match_rate'] . '%）で、来場人数と内訳の合計が一致しています。</p>';
+        echo '<div class="table-scroll"><table>';
+        echo '<thead><tr><th>来場人数との差</th><th class="num">組数</th></tr></thead><tbody>';
+        foreach ($group['check']['distribution'] as $label => $count) {
+            echo '<tr><td>' . e((string) $label) . '</td>';
+            echo '<td class="num">' . count_label($count, '組') . '</td></tr>';
+        }
+        echo '</tbody></table></div>';
+        echo '<p class="muted">来場人数は企業アンケートでの申告（同じ端末の新しい回答を優先）です。';
+        echo '差が出るのは珍しくありません（本人を数えたかどうか、あとから合流した方がいるなど）。';
+        echo '人数の集計そのものは来場人数のほうを使っています。</p>';
+        echo '</div>';
+    }
+}
+
 // ---------------------------------------------------------------- 総合アンケートの読み解き
 if ($isOverall && $event !== null && $responses > 0) {
-    $eventId = (int) $event['id'];
-    $laps    = visitor_laps($eventId);
-    $byLap   = satisfaction_by_lap_count($eventId, $laps, 'overall');
+    $byLap = satisfaction_by_lap_count($eventId, $laps, 'overall');
 
     echo '<h2>周回企業数との関係</h2>';
     echo '<div class="card">';

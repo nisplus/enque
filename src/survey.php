@@ -76,6 +76,10 @@ function number_settings(array $question): array
     if (is_party_size_question($question)) {
         $settings['max'] = party_size_max();
     }
+    // グループの内訳は「その区分は0人」が普通にあるので、下限を0にする
+    if (is_group_member_question($question)) {
+        $settings['min'] = 0;
+    }
 
     $decoded  = json_decode((string) ($question['options'] ?? ''), true);
     if (is_array($decoded)) {
@@ -107,6 +111,17 @@ function number_settings(array $question): array
 function is_party_size_question(array $question): bool
 {
     return (string) ($question['metric'] ?? 'none') === 'party_size';
+}
+
+/**
+ * グループの内訳として集計する設問か。
+ *
+ * 「小学生 ◯人」「大人 ◯人」のように、区分ごとの人数を聞く設問に付ける。
+ * 来場人数（party_size）とは別で、のべ来場者の集計には使わない。
+ */
+function is_group_member_question(array $question): bool
+{
+    return (string) ($question['metric'] ?? 'none') === 'group_member';
 }
 
 /**

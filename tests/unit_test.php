@@ -177,6 +177,19 @@ check('a value above the configured maximum is rejected',
     validate_answer($party, (string) (party_size_max() + 1))['ok'] === false);
 check('the configured maximum itself is accepted',
     validate_answer($party, (string) party_size_max())['value'] === (string) party_size_max());
+// グループの内訳（区分ごとの人数）の設問は、0人を受け付ける
+$groupMember = $number;
+$groupMember['metric']  = 'group_member';
+$groupMember['options'] = null;
+check('a group member question is recognised', is_group_member_question($groupMember));
+check('a group member question is not a party size', !is_party_size_question($groupMember));
+check('a group member question starts at zero people',
+    number_settings($groupMember)['min'] === 0, 'min=' . number_settings($groupMember)['min']);
+check('zero people is a valid answer', validate_answer($groupMember, '0')['value'] === '0');
+check('the breakdown keeps the maximum from the settings',
+    number_settings($groupMember)['max'] === NUMBER_DEFAULTS['max']);
+check('an explicit minimum still wins',
+    number_settings($groupMember + ['options' => '{"min":1}'])['min'] === 0);
 // 来場者に見せる呼び名と文面は .env で差し替えられる
 check('the booth label has a value', booth_label() !== '');
 check('the email note falls back to a sentence with the wallpaper label',

@@ -203,7 +203,7 @@ function render_question(array $question, array $previous = [], bool $invalid = 
                 echo '</div>';
             }
 
-            if ($value !== '') {
+            if ($value !== '' && is_party_size_question($question)) {
                 // 2社目以降は、前の企業で答えた人数をあらかじめ選んでおく
                 echo '<p class="muted">前にご回答いただいた人数を選んであります。違う場合は選び直してください。</p>';
             }

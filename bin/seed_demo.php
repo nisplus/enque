@@ -58,6 +58,9 @@ foreach ($companyNames as $i => $name) {
     $questions[] = ['id' => null, 'type' => 'multi', 'label' => '興味を持った内容はどれですか（複数選択可）', 'options' => ['製品デモ', '事業説明', '採用情報', 'ノベルティ'], 'required' => false];
     $questions[] = ['id' => null, 'type' => 'nps', 'label' => '当社を知人にすすめたいと思いますか', 'options' => [], 'required' => false];
     $questions[] = ['id' => null, 'type' => 'text', 'label' => 'ご意見・ご感想があればお聞かせください', 'options' => [], 'required' => false];
+    // 来場人数（のべ来場者の集計に使う）。2社目以降は前の企業で答えた人数が初期値になる
+    $questions[] = ['id' => null, 'type' => 'number', 'label' => '何人で来られましたか', 'options' => [],
+        'number' => ['min' => 1, 'max' => party_size_max(), 'unit' => '人'], 'metric' => 'party_size', 'required' => false];
 
     replace_questions($surveyId, $questions);
     update_survey($surveyId, $name . ' アンケート', 'ご来場ありがとうございます。差し支えなければご回答ください。', true);
@@ -72,6 +75,13 @@ replace_questions($overallId, [
     ['id' => null, 'type' => 'rating', 'label' => 'イベント全体の満足度を教えてください', 'options' => [], 'required' => true],
     ['id' => null, 'type' => 'multi', 'label' => '来場のきっかけを教えてください（複数選択可）', 'options' => ['Webサイト', 'SNS', '知人の紹介', 'DM・チラシ'], 'required' => false],
     ['id' => null, 'type' => 'text', 'label' => '次回に向けてのご意見をお聞かせください', 'options' => [], 'required' => false],
+    // グループの構成（区分ごとの人数）。来場人数とは別の集計で、のべ来場者には足さない
+    ['id' => null, 'type' => 'number', 'label' => '大人', 'options' => [],
+        'number' => ['min' => 0, 'max' => 20, 'unit' => '人'], 'metric' => 'group_member', 'required' => false],
+    ['id' => null, 'type' => 'number', 'label' => '小学生', 'options' => [],
+        'number' => ['min' => 0, 'max' => 20, 'unit' => '人'], 'metric' => 'group_member', 'required' => false],
+    ['id' => null, 'type' => 'number', 'label' => '未就学児', 'options' => [],
+        'number' => ['min' => 0, 'max' => 20, 'unit' => '人'], 'metric' => 'group_member', 'required' => false],
 ]);
 echo "総合アンケートを作成しました。\n";
 

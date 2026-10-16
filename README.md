@@ -226,6 +226,7 @@ mysql -u root -p enque -e "SHOW TABLES; SHOW COLUMNS FROM prize_claims;"
 | `sql/migrate_common_survey.sql` | `events.common_survey_from`（総合アンケートを何社目のブースから出すか）を追加 | 総合アンケートを会期中に集める版より前に `sql/schema.sql` でDBを作った場合 |
 | `sql/migrate_share_and_login.sql` | `events.share_token`（URL一覧の共有リンク）と `admin_users.last_login_at`（最終ログイン）を追加 | URL一覧の共有・最終ログイン表示より前に `sql/schema.sql` でDBを作った場合 |
 | `sql/migrate_response_edit.sql` | `responses.updated_at`（あとから書き直した日時）を追加 | 回答の書き直しより前に `sql/schema.sql` でDBを作った場合 |
+| `sql/migrate_group_member.sql` | `questions.metric` に `group_member`（グループの内訳）を追加 | グループの構成の集計より前に `sql/schema.sql` でDBを作った場合 |
 
 - **新規に構築する場合は `sql/schema.sql` だけで足ります**（マイグレーションは不要です）。
 - マイグレーションは `IF NOT EXISTS` で書いてあるので、**二度流しても壊れません**。
@@ -542,6 +543,14 @@ PHPの組み込みサーバーは逐次処理のため、**必ず Apache + php-f
 - **総合アンケートの集計は、企業の集計と同じ画面（`company_stats.php`）を `?survey=` で開きます。** 設問ごとの
   グラフを描く部分（`render_survey_stats`）をそのまま使い回せるためで、総合アンケートのときだけ回答率・
   周回企業数との関係・来場人数との関係を足しています。関係の表は相関であって因果ではないと画面にも明記します。
+- **人数の設問は「集計での扱い」で2通りに分けています（`questions.metric`）。** 「何人で来られましたか」は
+  `party_size` で、のべ来場者に足し上げます。「小学生 ◯人」「大人 ◯人」のように区分ごとに聞くものは
+  `group_member` で、**のべ来場者には足しません**（同じ人数を二重に数えてしまうため）。どちらも数値入力の
+  設問だけに付けられ、`group_member` は「その区分は0人」が普通にあるので下限が0になります。
+- **「グループの構成」は、1件の回答＝1グループとして読みます。** 区分別の人数と構成比、よくあるグループの型
+  （0人の区分は書かない）、区分ごとの平均周回企業数・平均評価、そして**来場人数との照合**（差の分布）を出します。
+  母数はその設問に答えたグループだけで会場全体ではないこと、来場人数と内訳の合計の食い違いは
+  「本人を数えたか」などで普通に起きることを画面に注記しています。人数の集計そのものは来場人数のほうを使います。
 - **受付はUSBバーコードリーダーで「読み取るだけ」で終われます。** リーダーはQRの中身（URL）をキーボードとして
   打ち込むので、照会画面の読み取り欄に常にカーソルを置き、読み取ったURLからコードを取り出して
   （`normalize_claim_code`）、そのまま交換済みまで記録します。渡す景品は読み取る前に選んでおき（1種類なら

@@ -566,6 +566,260 @@ function party_size_stats(int $eventId): array
     ];
 }
 
+/** グループの型として並べる上限（これより下は「その他」にまとめる） */
+const GROUP_PATTERN_LIMIT = 8;
+
+/** 「◯◯のみ」の行を出す最小グループ数（母数が小さい行は読み違いのもとになるため） */
+const GROUP_ONLY_MIN = 3;
+
+/**
+ * グループの構成（区分ごとの人数）の集計。
+ *
+ * 「小学生 ◯人」「大人 ◯人」のように区分ごとの人数を聞く設問（metric = group_member）を、
+ * 1件の回答＝1グループとして読む。来場人数（metric = party_size）とは別の集計で、
+ * のべ来場者には足さない（同じ人数を二重に数えないため）。
+ *
+ * 数え方の前提（画面にも注記する）：
+ *   - 母数はこのアンケートに答えたグループだけで、会場全体ではない
+ *   - どの区分にも人数を入れなかった回答は数えない
+ *   - 来場人数との差は、本人を含めたかどうかなど受け取り方の違いで普通に出る
+ *
+ * @param list<array<string,mixed>>|null $laps visitor_laps() の結果（周回企業数との関係に使う）
+ * @return array{
+ *   configured: bool, responses: int, groups: int, answer_rate: float, people: int, avg_size: float,
+ *   categories: list<array{label: string, people: int, share: float, groups: int, group_share: float, avg: float}>,
+ *   patterns: list<array{label: string, groups: int, share: float}>,
+ *   segments: list<array{label: string, groups: int, share: float, laps_avg: ?float, rating_avg: ?float}>,
+ *   check: array{compared: int, matched: int, match_rate: float, distribution: array<string,int>}
+ * }
+ */
+function group_member_stats(int $eventId, int $surveyId, ?array $laps = null): array
+{
+    $stats = [
+        'configured'  => false,
+        'responses'   => 0,
+        'groups'      => 0,
+        'answer_rate' => 0.0,
+        'people'      => 0,
+        'avg_size'    => 0.0,
+        'categories'  => [],
+        'patterns'    => [],
+        'segments'    => [],
+        'check'       => ['compared' => 0, 'matched' => 0, 'match_rate' => 0.0, 'distribution' => []],
+    ];
+
+    $stmt = db()->prepare(
+        "SELECT * FROM questions
+         WHERE survey_id = ? AND metric = 'group_member'
+         ORDER BY sort_order, id"
+    );
+    $stmt->execute([$surveyId]);
+    $questions = $stmt->fetchAll();
+    if ($questions === []) {
+        return $stats;
+    }
+    $stats['configured'] = true;
+
+    $stmt = db()->prepare('SELECT COUNT(*) FROM responses WHERE survey_id = ? AND is_duplicate = 0');
+    $stmt->execute([$surveyId]);
+    $stats['responses'] = (int) $stmt->fetchColumn();
+
+    // 1件の回答＝1グループとして、区分別の人数を集める
+    $stmt = db()->prepare(
+        "SELECT r.id, r.visitor_id, a.question_id, a.value
+         FROM responses r
+         JOIN answers a   ON a.response_id = r.id
+         JOIN questions q ON q.id = a.question_id AND q.metric = 'group_member'
+         WHERE r.survey_id = ? AND r.is_duplicate = 0
+           AND a.value IS NOT NULL AND a.value <> ''"
+    );
+    $stmt->execute([$surveyId]);
+
+    $groups = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $responseId = (int) $row['id'];
+        $groups[$responseId]['visitor'] = (int) $row['visitor_id'];
+        $groups[$responseId]['counts'][(int) $row['question_id']] = max(0, (int) $row['value']);
+    }
+    if ($groups === []) {
+        return $stats;
+    }
+
+    $byCategory = [];
+    foreach ($questions as $question) {
+        $byCategory[(int) $question['id']] = [
+            'label'  => (string) $question['label'],
+            'unit'   => number_settings($question)['unit'],
+            'people' => 0,
+            'groups' => 0,
+        ];
+    }
+
+    // 区分別の人数と、グループの型（0人の区分は書かない）
+    $groupCount    = count($groups);
+    $totalPeople   = 0;
+    $patternCounts = [];
+    $includes      = [];
+    $onlys         = [];
+    foreach ($groups as $group) {
+        $size    = 0;
+        $parts   = [];
+        $present = [];
+        foreach ($byCategory as $questionId => $info) {
+            $count = $group['counts'][$questionId] ?? 0;
+            $size += $count;
+            if ($count > 0) {
+                $byCategory[$questionId]['people'] += $count;
+                $byCategory[$questionId]['groups']++;
+                $parts[]   = $info['label'] . $count . $info['unit'];
+                $present[] = $questionId;
+            }
+        }
+        $totalPeople += $size;
+
+        $label = $parts === [] ? '（どの区分も0人）' : implode('・', $parts);
+        $patternCounts[$label] = ($patternCounts[$label] ?? 0) + 1;
+
+        foreach ($present as $questionId) {
+            $includes[$questionId][] = $group['visitor'];
+        }
+        if (count($present) === 1) {
+            $onlys[$present[0]][] = $group['visitor'];
+        }
+    }
+
+    $stats['groups']      = $groupCount;
+    $stats['answer_rate'] = percentage($groupCount, $stats['responses']);
+    $stats['people']      = $totalPeople;
+    $stats['avg_size']    = round($totalPeople / $groupCount, 2);
+
+    foreach ($byCategory as $info) {
+        $stats['categories'][] = [
+            'label'       => $info['label'],
+            'people'      => $info['people'],
+            'share'       => percentage($info['people'], $totalPeople),
+            'groups'      => $info['groups'],
+            'group_share' => percentage($info['groups'], $groupCount),
+            'avg'         => round($info['people'] / $groupCount, 2),
+        ];
+    }
+
+    arsort($patternCounts);
+    $rest = 0;
+    foreach ($patternCounts as $label => $count) {
+        if (count($stats['patterns']) < GROUP_PATTERN_LIMIT) {
+            $stats['patterns'][] = [
+                'label'  => (string) $label,
+                'groups' => $count,
+                'share'  => percentage($count, $groupCount),
+            ];
+            continue;
+        }
+        $rest++;
+    }
+    if ($rest > 0) {
+        $others = (int) array_sum(array_slice(array_values($patternCounts), GROUP_PATTERN_LIMIT));
+        $stats['patterns'][] = [
+            'label'  => 'その他（' . $rest . '通り）',
+            'groups' => $others,
+            'share'  => percentage($others, $groupCount),
+        ];
+    }
+
+    // 周回企業数・評価との関係は「相関」として見る（因果ではない）
+    $laps ??= visitor_laps($eventId);
+    $companies = [];
+    foreach ($laps as $lap) {
+        $companies[(int) $lap['visitor_id']] = (int) $lap['companies'];
+    }
+
+    $stmt = db()->prepare(
+        "SELECT r.visitor_id, AVG(CAST(a.value AS DECIMAL(10,4))) AS rating
+         FROM answers a
+         JOIN questions q ON q.id = a.question_id AND q.type = 'rating'
+         JOIN responses r ON r.id = a.response_id
+         WHERE r.survey_id = ? AND r.is_duplicate = 0 AND a.value IS NOT NULL AND a.value <> ''
+         GROUP BY r.visitor_id"
+    );
+    $stmt->execute([$surveyId]);
+    $ratings = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $ratings[(int) $row['visitor_id']] = (float) $row['rating'];
+    }
+
+    $segment = static function (string $label, array $visitorIds) use ($companies, $ratings, $groupCount): array {
+        $lapValues    = [];
+        $ratingValues = [];
+        foreach ($visitorIds as $visitorId) {
+            if (isset($companies[$visitorId])) {
+                $lapValues[] = $companies[$visitorId];
+            }
+            if (isset($ratings[$visitorId])) {
+                $ratingValues[] = $ratings[$visitorId];
+            }
+        }
+
+        return [
+            'label'      => $label,
+            'groups'     => count($visitorIds),
+            'share'      => percentage(count($visitorIds), $groupCount),
+            'laps_avg'   => $lapValues === [] ? null : round(array_sum($lapValues) / count($lapValues), 2),
+            'rating_avg' => $ratingValues === [] ? null : round(array_sum($ratingValues) / count($ratingValues), 2),
+        ];
+    };
+
+    foreach ($byCategory as $questionId => $info) {
+        if (($includes[$questionId] ?? []) !== []) {
+            $stats['segments'][] = $segment($info['label'] . 'を含む', $includes[$questionId]);
+        }
+    }
+    foreach ($byCategory as $questionId => $info) {
+        if (count($onlys[$questionId] ?? []) >= GROUP_ONLY_MIN) {
+            $stats['segments'][] = $segment($info['label'] . 'のみ', $onlys[$questionId]);
+        }
+    }
+
+    // 来場人数（企業アンケートでの申告）と内訳の合計がそろっているか
+    $partySizes = party_sizes_for_event($eventId);
+    $diffs      = [];
+    $compared   = 0;
+    $matched    = 0;
+    foreach ($groups as $group) {
+        $party = $partySizes[$group['visitor']] ?? null;
+        if ($party === null) {
+            continue;
+        }
+        $size = 0;
+        foreach ($byCategory as $questionId => $info) {
+            $size += $group['counts'][$questionId] ?? 0;
+        }
+        $diff = $size - $party;
+        $compared++;
+        if ($diff === 0) {
+            $matched++;
+        }
+        $diffs[$diff] = ($diffs[$diff] ?? 0) + 1;
+    }
+    ksort($diffs, SORT_NUMERIC);
+    $distribution = [];
+    foreach ($diffs as $diff => $count) {
+        $label = match (true) {
+            $diff === 0 => '一致',
+            $diff > 0   => '内訳が多い（＋' . $diff . '人）',
+            default     => '内訳が少ない（' . $diff . '人）',
+        };
+        $distribution[$label] = $count;
+    }
+    $stats['check'] = [
+        'compared'     => $compared,
+        'matched'      => $matched,
+        'match_rate'   => percentage($matched, $compared),
+        'distribution' => $distribution,
+    ];
+
+    return $stats;
+}
+
 /** 秒数を「1時間23分」のように読みやすくする */
 function format_duration(float $seconds): string
 {

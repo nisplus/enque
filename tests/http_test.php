@@ -493,8 +493,8 @@ check('csv does not contain the email address', !str_contains($res['body'], '@ex
 // グループ単位で読めるよう、来場人数と回答企業数を添える（Excelでのクロス集計用）
 check('csv carries the party size and booth count',
     str_contains($res['body'], '"来場人数","回答企業数"'), mb_substr($res['body'], 0, 80));
-$csvLines = explode("
-", trim($res['body']));
+// CSVはCRLF改行（Excel向け）なので、その区切りで行に分ける
+$csvLines = explode("\r\n", trim($res['body']));
 $csvRow   = str_getcsv($csvLines[1] ?? '');
 check('the booth count is filled in', (int) ($csvRow[5] ?? 0) >= 1, 'row=' . ($csvLines[1] ?? ''));
 
@@ -1464,6 +1464,111 @@ check('the dashboard links to the insights page', str_contains($res['body'], 'in
 check('the dashboard shows the average lap time', str_contains($res['body'], '平均 周回時間'));
 check('the dashboard shows the total visits tile', str_contains($res['body'], 'のべ来場者'));
 check('the total visits tile explains the calculation', str_contains($res['body'], '各企業の回答者数の合計'));
+
+echo "=== group composition ===\n";
+
+// 総合アンケートに「区分ごとの人数」を置き、グループの構成として集計できるか確かめる
+$groupSurveyId = create_survey($insightEventId, null, 'overall', 'TEST GROUP ' . $stamp, null, true);
+replace_questions($groupSurveyId, [
+    ['id' => null, 'type' => 'rating', 'label' => '満足度', 'options' => [], 'required' => false, 'metric' => 'none'],
+    ['id' => null, 'type' => 'number', 'label' => '大人', 'options' => [],
+        'number' => ['min' => 0, 'max' => 20, 'unit' => '人'], 'required' => false, 'metric' => 'group_member'],
+    ['id' => null, 'type' => 'number', 'label' => '小学生', 'options' => [],
+        'number' => ['min' => 0, 'max' => 20, 'unit' => '人'], 'required' => false, 'metric' => 'group_member'],
+    ['id' => null, 'type' => 'number', 'label' => '未就学児', 'options' => [],
+        'number' => ['min' => 0, 'max' => 20, 'unit' => '人'], 'required' => false, 'metric' => 'group_member'],
+]);
+$groupQuestions = questions_for_survey($groupSurveyId);
+check('the breakdown question is marked as a group member',
+    is_group_member_question($groupQuestions[1]) && !is_group_member_question($groupQuestions[0]));
+check('the breakdown question allows zero people',
+    number_settings($groupQuestions[1])['min'] === 0, 'min=' . number_settings($groupQuestions[1])['min']);
+
+[$gRating, $gAdult, $gPrimary, $gPre] = array_map(static fn(array $q): int => (int) $q['id'], $groupQuestions);
+
+// v1: 大人2・小学生1（来場人数3人と一致）／v2: 大人1・未就学児1／v3: 大人2のみ
+insert_response($groupSurveyId, $v1, [$gRating => '5', $gAdult => '2', $gPrimary => '1', $gPre => '0']);
+insert_response($groupSurveyId, $v2, [$gRating => '3', $gAdult => '1', $gPrimary => '0', $gPre => '1']);
+insert_response($groupSurveyId, $v3, [$gRating => '4', $gAdult => '2', $gPrimary => '0', $gPre => '0']);
+
+$groupStats = group_member_stats($insightEventId, $groupSurveyId);
+check('the group breakdown is configured', $groupStats['configured'] === true);
+check('one response counts as one group', $groupStats['groups'] === 3, 'groups=' . $groupStats['groups']);
+check('the breakdown adds up every category', $groupStats['people'] === 7, 'people=' . $groupStats['people']);
+check('the average group size comes from the breakdown',
+    $groupStats['avg_size'] === 2.33, 'avg=' . $groupStats['avg_size']);
+check('each category is totalled', $groupStats['categories'][0]['people'] === 5
+    && $groupStats['categories'][1]['people'] === 1 && $groupStats['categories'][2]['people'] === 1);
+check('the category share is of the breakdown total',
+    $groupStats['categories'][0]['share'] === percentage(5, 7), 'share=' . $groupStats['categories'][0]['share']);
+check('a category counts the groups it appeared in', $groupStats['categories'][1]['groups'] === 1
+    && $groupStats['categories'][1]['group_share'] === percentage(1, 3));
+
+$patternLabels = array_column($groupStats['patterns'], 'label');
+check('a pattern leaves out the categories with nobody in them',
+    in_array('大人2人・小学生1人', $patternLabels, true) && in_array('大人2人', $patternLabels, true),
+    implode(' / ', $patternLabels));
+check('every group falls into one pattern',
+    array_sum(array_column($groupStats['patterns'], 'groups')) === 3);
+
+$groupSegments = [];
+foreach ($groupStats['segments'] as $row) {
+    $groupSegments[$row['label']] = $row;
+}
+check('a segment is reported for each category',
+    isset($groupSegments['大人を含む'], $groupSegments['小学生を含む'], $groupSegments['未就学児を含む']),
+    implode(' / ', array_keys($groupSegments)));
+check('the segments overlap on purpose', $groupSegments['大人を含む']['groups'] === 3
+    && $groupSegments['小学生を含む']['groups'] === 1);
+check('the booth count is averaged per segment', $groupSegments['大人を含む']['laps_avg'] === 2.0,
+    'laps=' . var_export($groupSegments['大人を含む']['laps_avg'], true));
+check('the rating is averaged per segment', $groupSegments['大人を含む']['rating_avg'] === 4.0,
+    'rating=' . var_export($groupSegments['大人を含む']['rating_avg'], true));
+check('a single-category segment needs enough groups to be shown',
+    !isset($groupSegments['大人のみ']), implode(' / ', array_keys($groupSegments)));
+
+check('only the groups with a party size are compared',
+    $groupStats['check']['compared'] === 1, 'compared=' . $groupStats['check']['compared']);
+check('a matching breakdown is reported as a match', $groupStats['check']['matched'] === 1
+    && ($groupStats['check']['distribution']['一致'] ?? 0) === 1);
+
+// 来場人数と内訳の合計がずれている組は、差の分布で分かるようにする
+$partyAnswer->execute([(int) $partyQuestion['id'], '5', $partySurveyId, $v3]);
+$groupStats = group_member_stats($insightEventId, $groupSurveyId);
+check('a mismatching breakdown is reported with its difference',
+    $groupStats['check']['compared'] === 2
+    && ($groupStats['check']['distribution']['内訳が少ない（-3人）'] ?? 0) === 1,
+    implode(' / ', array_keys($groupStats['check']['distribution'])));
+check('the match rate is of the compared groups',
+    $groupStats['check']['match_rate'] === percentage(1, 2), 'rate=' . $groupStats['check']['match_rate']);
+
+// 区分ごとの人数は、来場人数（のべ来場者）の集計には混ぜない
+$groupParty = party_size_stats($insightEventId);
+check('the breakdown is left out of the party size counts',
+    $groupParty['answered'] === 2, 'answered=' . $groupParty['answered']);
+
+$res = request('GET', '/admin/company_stats.php?survey=' . $groupSurveyId, null, 'org');
+check('the stats page shows the group composition',
+    $res['status'] === 200 && str_contains($res['body'], 'グループの構成'), 'status=' . $res['status']);
+check('the stats page lists the categories', str_contains($res['body'], '区分別の人数'));
+check('the stats page lists the common patterns', str_contains($res['body'], 'よくあるグループの型'));
+check('the stats page relates the categories to the booth count',
+    str_contains($res['body'], '区分ごとの傾向'));
+check('the stats page checks the breakdown against the party size',
+    str_contains($res['body'], '来場人数との照合'));
+check('the stats page says the breakdown is not added to the visitor count',
+    str_contains($res['body'], 'のべ来場者には足していません'));
+
+$res = request('GET', '/admin/survey_edit.php?survey=' . $groupSurveyId, null, 'org');
+check('the editor remembers the group breakdown setting',
+    str_contains($res['body'], 'value="group_member" selected'), 'status=' . $res['status']);
+check('the editor offers every way of aggregating a number',
+    str_contains($res['body'], 'value="party_size"') && str_contains($res['body'], '集計での扱い'));
+
+// 回答画面では、内訳は0人から入れられる数値入力で出す（来場人数だけが選択式）
+$res = request('GET', $partyPath, null, 'groupv');
+check('a breakdown question renders as a number input starting at zero',
+    str_contains($res['body'], 'min="0" max="20"'), 'status=' . $res['status']);
 
 // 後片付け（このイベントぶんだけ消す）
 $cleanup = db()->prepare('DELETE FROM events WHERE id = ?');

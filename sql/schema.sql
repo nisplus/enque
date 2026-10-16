@@ -62,7 +62,8 @@ CREATE TABLE IF NOT EXISTS surveys (
 -- rating は最大値（既定5）、nps は 0-10 固定のため options は使わない。
 --
 -- metric は、その設問の回答を集計指標として扱うかどうか。
---   party_size … 「何人で来られましたか」のような来場人数。のべ来場者の集計に使う
+--   party_size   … 「何人で来られましたか」のような来場人数。のべ来場者の集計に使う
+--   group_member … グループの内訳（小学生・大人など区分ごとの人数）
 CREATE TABLE IF NOT EXISTS questions (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   survey_id  INT UNSIGNED NOT NULL,
@@ -70,7 +71,7 @@ CREATE TABLE IF NOT EXISTS questions (
   label      VARCHAR(500) NOT NULL,
   options    TEXT NULL,
   required   TINYINT(1) NOT NULL DEFAULT 0,
-  metric     ENUM('none','party_size') NOT NULL DEFAULT 'none',
+  metric     ENUM('none','party_size','group_member') NOT NULL DEFAULT 'none',
   sort_order INT NOT NULL DEFAULT 0,
   INDEX idx_question_survey (survey_id, sort_order),
   CONSTRAINT fk_question_survey FOREIGN KEY (survey_id) REFERENCES surveys(id) ON DELETE CASCADE

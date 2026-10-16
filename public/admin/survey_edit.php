@@ -67,8 +67,10 @@ function parse_posted_questions(): array
             'options'  => $options,
             'number'   => $number,
             'required' => ($row['required'] ?? '') === '1',
-            // 来場人数として集計するかどうか（数値入力のときだけ有効）
-            'metric'   => $type === 'number' && ($row['metric'] ?? '') === 'party_size' ? 'party_size' : 'none',
+            // 集計での扱い（数値入力のときだけ有効）
+            'metric'   => $type === 'number' && in_array($row['metric'] ?? '', ['party_size', 'group_member'], true)
+                ? (string) $row['metric']
+                : 'none',
             'sort'     => (int) ($row['sort'] ?? $index),
         ];
     }
@@ -206,7 +208,7 @@ $render = static function (?array $question, int $index, bool $isNew = false) us
     echo '<div class="q-grid">';
     echo '<label class="field">設問文<input type="text" name="q[' . $index . '][label]" value="' . e($label) . '"'
         . ($isNew ? ' autofocus' : '') . '></label>';
-    echo '<label class="field">種類<select name="q[' . $index . '][type]">';
+    echo '<label class="field">種類<select class="q-type" name="q[' . $index . '][type]">';
     foreach (QuestionType::cases() as $case) {
         $selected = $case->value === $type ? ' selected' : '';
         echo '<option value="' . $case->value . '"' . $selected . '>' . e($case->label()) . '</option>';
@@ -243,18 +245,25 @@ $render = static function (?array $question, int $index, bool $isNew = false) us
     echo '<label class="field">並び順<input type="number" name="q[' . $index . '][sort]" value="' . ($index + 1) . '"></label>';
     echo '</div>';
 
-    // 来場人数として集計する設問の指定。数値入力のときだけ出す（種類を変えると下のJSで出し入れする）
-    $isParty = $question !== null && is_party_size_question($question);
+    // 集計での扱い。数値入力のときだけ出す（種類を変えると下のJSで出し入れする）
+    $metric = $question === null ? 'none' : (string) ($question['metric'] ?? 'none');
     echo '<div class="metric-field"' . ($type === 'number' ? '' : ' hidden') . '>';
-    echo '<label class="choice"><input type="checkbox" name="q[' . $index . '][metric]" value="party_size"'
-        . ($isParty ? ' checked' : '') . '>';
-    echo '<span>この回答を<strong>来場人数</strong>として集計する'
-        . '<span class="hint">「何人で来られましたか」のような設問に付けます。'
+    echo '<label class="field">集計での扱い';
+    echo '<select name="q[' . $index . '][metric]">';
+    foreach (['none' => '集計に使わない', 'party_size' => '来場人数として集計する',
+              'group_member' => 'グループの内訳として集計する'] as $value => $metricLabel) {
+        echo '<option value="' . $value . '"' . ($metric === $value ? ' selected' : '') . '>'
+            . e($metricLabel) . '</option>';
+    }
+    echo '</select>';
+    echo '<span class="hint">';
+    echo '<strong>来場人数</strong>…「何人で来られましたか」のような設問に付けます。'
         . '回答画面は <strong>1〜' . party_size_max() . '人以上の選択式</strong>になり、'
         . 'ダッシュボードの「のべ来場者」に足し上げられます。'
-        . '<strong>2社目以降は前の企業で答えた人数が初期値として入る</strong>ため'
-        . '（同じスマホ・同じブラウザの場合）、必須にしても来場者の手間はほとんど増えません。'
-        . '</span></span></label>';
+        . '2社目以降は前の企業で答えた人数が初期値として入ります。<br>';
+    echo '<strong>グループの内訳</strong>…「小学生 ◯人」「大人 ◯人」のように、区分ごとの人数を聞く設問に付けます。'
+        . '集計画面に「グループの構成」が出ます（人数が重複しないよう、のべ来場者には足しません）。';
+    echo '</span></label>';
     echo '</div>';
 
     echo '</div>';
@@ -278,13 +287,14 @@ echo '<p class="muted">設問文が空のまま保存すると、その行は登
 echo '既存の設問を削除すると、その設問への回答も一緒に削除されます。</p>';
 echo '</form>';
 
-// 種類を「数値入力」にしたときだけ、来場人数のチェックボックスを出す
+// 種類を「数値入力」にしたときだけ、集計での扱いの欄を出す
 echo '<script>document.querySelectorAll(".q-editor").forEach(function (box) {'
-    . 'var type = box.querySelector("select"), metric = box.querySelector(".metric-field");'
+    . 'var type = box.querySelector(".q-type");'
+    . 'var metric = box.querySelector(".metric-field");'
     . 'if (!type || !metric) { return; }'
     . 'type.addEventListener("change", function () {'
     . 'metric.hidden = type.value !== "number";'
-    . 'if (metric.hidden) { metric.querySelector("input").checked = false; }'
+    . 'if (metric.hidden) { metric.querySelector("select").value = "none"; }'
     . '});'
     . '});</script>';
 

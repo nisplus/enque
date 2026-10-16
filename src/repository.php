@@ -383,7 +383,9 @@ function replace_questions(int $surveyId, array $questions): void
                     ? null
                     : json_encode(array_values($q['options']), JSON_UNESCAPED_UNICODE);
             }
-            $metric = ($q['metric'] ?? 'none') === 'party_size' ? 'party_size' : 'none';
+            $metric = in_array($q['metric'] ?? 'none', ['party_size', 'group_member'], true)
+                ? (string) $q['metric']
+                : 'none';
 
             if ($q['id'] !== null) {
                 $stmt = db()->prepare(
