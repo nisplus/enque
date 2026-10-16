@@ -421,7 +421,7 @@ C:\xampp\php\php.exe bin\seed_traffic.php --force --visitors=200
 ```
 C:\xampp\php\php.exe tests\unit_test.php                  REM DB・サーバー不要（83項目）
 serve.cmd                                                 REM 別ウィンドウで起動しておく
-C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（356項目）
+C:\xampp\php\php.exe tests\http_test.php --force          REM E2E（358項目）
 node tests\scan_test.js                                   REM QR読み取り判定（27項目・Nodeがある場合のみ）
 ```
 
@@ -483,6 +483,8 @@ PHPの組み込みサーバーは逐次処理のため、**必ず Apache + php-f
   混入し、`deploy/cron-enque`（CRLF だと cron がジョブを読めない）やシェルから実行するファイルが
   壊れます。Windows専用の `serve.cmd` だけは CRLF で取り出す設定です。
 - **CSVはUTF-8 BOM付き・CRLF改行**です。Excelでそのまま開けます。
+  1アンケートぶんのCSVには、来場者ID・来場人数・回答企業数を添えます（1行＝1グループとして読め、
+  Excelのピボットでグループ構成を集計できるため）。
   メールアドレスは出力しません。来場者は匿名ID（`visitor_id`）だけを出力するので、
   企業をまたいだ同一来場者の突き合わせはこのIDで行えます。
 - ログイン失敗が同一IPから1分間に5回に達すると、そのIPは一時的にロックされます。

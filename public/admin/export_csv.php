@@ -87,7 +87,11 @@ $questions = questions_for_survey($surveyId);
 $responses = responses_for_survey($surveyId, $includeDuplicates);
 $answers   = answers_for_responses(array_map(static fn(array $r): int => (int) $r['id'], $responses));
 
-$header = ['回答ID', '来場者ID', '送信日時', '重複'];
+// 来場人数と回答企業数を添える。1行＝1グループになり、Excelでそのままクロス集計できる
+$partySizes  = party_sizes_for_event((int) $survey['event_id']);
+$visitCounts = visited_counts_for_event((int) $survey['event_id']);
+
+$header = ['回答ID', '来場者ID', '送信日時', '重複', '来場人数', '回答企業数'];
 foreach ($questions as $question) {
     $header[] = (string) $question['label'];
 }
@@ -95,11 +99,14 @@ $rows = [$header];
 
 foreach ($responses as $response) {
     $rid = (int) $response['id'];
+    $visitorId = (int) $response['visitor_id'];
     $row = [
         $rid,
-        (int) $response['visitor_id'],
+        $visitorId,
         (string) $response['submitted_at'],
         (int) $response['is_duplicate'] === 1 ? '重複' : '',
+        $partySizes[$visitorId] ?? '',
+        $visitCounts[$visitorId] ?? 0,
     ];
     foreach ($questions as $question) {
         $value = $answers[$rid][(int) $question['id']] ?? null;

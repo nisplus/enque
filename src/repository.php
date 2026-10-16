@@ -680,6 +680,59 @@ function replace_response_answers(int $responseId, array $answers): void
 }
 
 /**
+ * イベント内の来場者ごとの来場人数（申告された値。新しい回答を優先）。
+ *
+ * CSVに列として添えるため、1件ずつ引かずにまとめて取る。
+ *
+ * @return array<int,int> visitor_id => 人数
+ */
+function party_sizes_for_event(int $eventId): array
+{
+    $stmt = db()->prepare(
+        "SELECT r.visitor_id,
+                SUBSTRING_INDEX(GROUP_CONCAT(a.value ORDER BY r.submitted_at DESC, r.id DESC), ',', 1) AS value
+         FROM answers a
+         JOIN questions q ON q.id = a.question_id AND q.metric = 'party_size'
+         JOIN responses r ON r.id = a.response_id
+         JOIN surveys s   ON s.id = r.survey_id
+         WHERE s.event_id = ? AND a.value IS NOT NULL AND a.value <> ''
+         GROUP BY r.visitor_id"
+    );
+    $stmt->execute([$eventId]);
+
+    $sizes = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $sizes[(int) $row['visitor_id']] = (int) $row['value'];
+    }
+
+    return $sizes;
+}
+
+/**
+ * イベント内の来場者ごとの回答企業数。
+ *
+ * @return array<int,int> visitor_id => 社数
+ */
+function visited_counts_for_event(int $eventId): array
+{
+    $stmt = db()->prepare(
+        "SELECT r.visitor_id, COUNT(DISTINCT s.company_id) AS visited
+         FROM responses r
+         JOIN surveys s ON s.id = r.survey_id
+         WHERE s.event_id = ? AND s.type = 'company' AND r.is_duplicate = 0
+         GROUP BY r.visitor_id"
+    );
+    $stmt->execute([$eventId]);
+
+    $counts = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $counts[(int) $row['visitor_id']] = (int) $row['visited'];
+    }
+
+    return $counts;
+}
+
+/**
  * その来場者が、別の企業で答えた来場人数（無ければ null）。
  *
  * 2社目以降の回答画面に初期値として出し、集計でも持ち越して使う。

@@ -490,6 +490,14 @@ check('csv uses CRLF line endings', str_contains($res['body'], "\r\n"));
 check('csv contains the answer text', str_contains($res['body'], '情報収集'));
 check('csv does not contain the email address', !str_contains($res['body'], '@example.jp'));
 
+// グループ単位で読めるよう、来場人数と回答企業数を添える（Excelでのクロス集計用）
+check('csv carries the party size and booth count',
+    str_contains($res['body'], '"来場人数","回答企業数"'), mb_substr($res['body'], 0, 80));
+$csvLines = explode("
+", trim($res['body']));
+$csvRow   = str_getcsv($csvLines[1] ?? '');
+check('the booth count is filled in', (int) ($csvRow[5] ?? 0) >= 1, 'row=' . ($csvLines[1] ?? ''));
+
 $res = request('GET', '/admin/export_csv.php?event=' . $eventId, null, 'org');
 check('organizer csv covers every company',
     str_contains($res['body'], 'TEST CO A') && str_contains($res['body'], '企業名'));
