@@ -23,6 +23,20 @@
   --warn-soft:      #fdf3e0;
   /* グラフ（dataviz の検証済みパレット） */
   --series-1:       #2a78d6;
+  /* 帯グラフ（積み上げ）の名義尺度。色だけに頼らないよう、凡例を必ず添える */
+  --series-2:       #1baf7a;
+  --series-3:       #eb6834;
+  --series-4:       #8a5ad8;
+  --series-5:       #b08900;
+  --series-6:       #1f9aa8;
+  --series-7:       #c3568f;
+  --series-8:       #6b7684;
+  /* 順序尺度（星1〜5・人数の区分など）は同じ青の濃淡で並び順を見せる */
+  --ramp-1:         #cfe0f6;
+  --ramp-2:         #9cc2ee;
+  --ramp-3:         #6aa3e3;
+  --ramp-4:         #3b85d8;
+  --ramp-5:         #1f5fa8;
   --chart-track:    #eceae4;
   --chart-grid:     #e2e0d9;
   --radius:         10px;
@@ -49,6 +63,18 @@
     --warn:           #d8a93f;
     --warn-soft:      #2e2617;
     --series-1:       #3987e5;
+    --series-2:       #35c08d;
+    --series-3:       #f58154;
+    --series-4:       #a47ae6;
+    --series-5:       #d8a93f;
+    --series-6:       #46c6d2;
+    --series-7:       #d87aa9;
+    --series-8:       #949fad;
+    --ramp-1:         #24405f;
+    --ramp-2:         #2f5c8c;
+    --ramp-3:         #3b7ab8;
+    --ramp-4:         #4e98db;
+    --ramp-5:         #7fb7ec;
     --chart-track:    #32322f;
     --chart-grid:     #3a3a36;
     --shadow:         0 1px 2px rgba(0, 0, 0, .4);
@@ -270,6 +296,20 @@ label.choice span.hint { display: block; margin-top: 4px; font-size: .85rem; col
 .chart-track { fill: var(--chart-track); }
 .chart-bar   { fill: var(--series-1); }
 .chart-grid  { stroke: var(--chart-grid); stroke-width: 1; }
+/* 帯グラフの目盛り線は色の上に重なるので、少し透かして邪魔にならないようにする */
+.chart-tick  { stroke-opacity: .55; }
+.chart-stacked { margin-bottom: 2px; }
+
+/* 帯グラフの凡例（ラベル・件数・割合）。色が見分けにくい環境でもここで読める */
+.chart-legend {
+  display: flex; flex-wrap: wrap; gap: 4px 18px;
+  margin: 2px 0 6px; padding: 0; list-style: none; font-size: .85rem;
+}
+.chart-legend li { display: flex; align-items: center; gap: 6px; }
+.chart-legend .chip {
+  width: 12px; height: 12px; border-radius: 3px; flex: none;
+  border: 1px solid rgba(0, 0, 0, .08);
+}
 .chart-line  { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .chart-dot   { fill: var(--series-1); stroke: var(--surface-2); stroke-width: 2; }
 

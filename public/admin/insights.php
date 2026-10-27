@@ -87,6 +87,7 @@ if ($party['configured']) {
         render_stat('回答率', $party['answer_rate'] . '%',
             $party['answered'] . ' / ' . $party['responses'] . '件');
         echo '</div>';
+        echo svg_stacked_bar($party['distribution'], $party['answered'], 'ramp');
         echo svg_bar_chart($party['distribution'], $party['answered']);
         echo '<p class="muted">人数は任意回答のため、未回答のぶんは';
         echo '<strong>同じ来場者が別の企業で答えた人数</strong>などから補って計算しています。';
@@ -105,6 +106,7 @@ render_stat('中央値', (string) $lapCompanies['summary']['median'] . '社');
 render_stat('最大', (string) (int) $lapCompanies['summary']['max'] . '社');
 render_stat('最小', (string) (int) $lapCompanies['summary']['min'] . '社');
 echo '</div>';
+echo svg_stacked_bar($lapCompanies['distribution'], count($laps), 'ramp');
 echo svg_bar_chart($lapCompanies['distribution'], count($laps));
 echo '<p class="muted">棒は「その社数を回った人が何人いたか」です。</p>';
 echo '</div>';
@@ -121,6 +123,7 @@ if ($lapTime['summary']['count'] === 0) {
     render_stat('最長', format_duration($lapTime['summary']['max']));
     render_stat('最短', format_duration($lapTime['summary']['min']));
     echo '</div>';
+    echo svg_stacked_bar($lapTime['distribution'], $lapTime['summary']['count'], 'ramp');
     echo svg_bar_chart($lapTime['distribution'], $lapTime['summary']['count']);
 }
 echo '</div>';

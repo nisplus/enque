@@ -218,6 +218,51 @@ check('rating average is rounded to two decimals',
     rating_average(['1' => 1, '5' => 2]) === 3.67, (string) rating_average(['1' => 1, '5' => 2]));
 check('percentage avoids division by zero', percentage(3, 0) === 0.0);
 
+// 横棒は母数（100%）を基準にする。灰色の下地がちょうど100%にあたる
+$bars = svg_bar_chart(['A' => 25, 'B' => 75], 100);
+// 25%の棒は下地（544px）の4分の1。角丸のぶん4pxは曲線で描くので、直線部分は136-4
+preg_match('/<path class="chart-bar" d="M4\.0 25\.0 h([\d.]+)/', $bars, $bar);
+check('the bar chart scales to the total, not to the largest value',
+    abs(((float) ($bar[1] ?? 0) + 4) - 544 * 0.25) < 0.01, 'bar=' . ($bar[1] ?? 'none'));
+check('the bar chart draws the full-width track', str_contains($bars, 'width="544"'));
+check('the bar chart shows the end labels', str_contains($bars, '>0%</text>')
+    && str_contains($bars, '>100%</text>'));
+check('the bar chart falls back to the largest value without a total',
+    !str_contains(svg_bar_chart(['A' => 25, 'B' => 75], 0), '>100%</text>'));
+
+// 帯グラフ（100%積み上げ）
+$stacked = svg_stacked_bar(['A' => 1, 'B' => 2, 'C' => 1], 4);
+check('the stacked bar starts at the left edge', str_contains($stacked, 'x="0" y="0" width="159.25"'),
+    'first segment missing');
+preg_match_all('/<rect x="([\d.]+)" y="0" width="([\d.]+)"/', $stacked, $segs);
+$stackedEnd = (float) end($segs[1]) + (float) end($segs[2]);
+check('the stacked bar ends exactly at the right edge', abs($stackedEnd - 640) < 0.01,
+    'end=' . $stackedEnd);
+check('the stacked bar lists every item in the legend',
+    substr_count($stacked, '<li>') === 3, 'legend items=' . substr_count($stacked, '<li>'));
+check('the legend carries the count and the share', str_contains($stacked, '2件 (50%)'));
+check('the legend unit can be changed',
+    str_contains(svg_stacked_bar(['A' => 1], 1, 'series', '組'), '1組 (100%)'));
+check('an empty stacked bar renders nothing', svg_stacked_bar([], 0) === '');
+check('a stacked bar without a denominator renders nothing', svg_stacked_bar(['A' => 1], 0) === '');
+
+// 端数で帯がずれない（3等分しても右端は100%で終わる）
+$thirds = svg_stacked_bar(['A' => 1, 'B' => 1, 'C' => 1], 3);
+preg_match_all('/<rect x="([\d.]+)" y="0" width="([\d.]+)"/', $thirds, $segs);
+check('rounding never leaves a gap at the right edge',
+    abs(((float) end($segs[1]) + (float) end($segs[2])) - 640) < 0.01,
+    'end=' . ((float) end($segs[1]) + (float) end($segs[2])));
+
+check('the series palette repeats after the last colour',
+    chart_colors('series', 9)[8] === chart_colors('series', 9)[0]);
+check('the ramp spans from the lightest to the darkest',
+    chart_colors('ramp', 3) === ['var(--ramp-1)', 'var(--ramp-3)', 'var(--ramp-5)'],
+    implode(',', chart_colors('ramp', 3)));
+check('a single item takes the darkest step of the ramp',
+    chart_colors('ramp', 1) === ['var(--ramp-5)']);
+check('an explicit palette is used as given',
+    chart_colors(['var(--good)', 'var(--danger)'], 3)[2] === 'var(--good)');
+
 echo "=== csv ===\n";
 
 check('csv quotes every cell and ends with CRLF', csv_line(['a', 'b']) === "\"a\",\"b\"\r\n");

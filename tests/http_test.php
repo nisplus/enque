@@ -481,6 +481,10 @@ check('company user cannot manage users', $res['status'] === 404);
 $res = request('GET', '/admin/company_stats.php?company=' . $companyAId, null, 'co');
 check('company user can open its own stats', $res['status'] === 200);
 check('stats page renders a chart', str_contains($res['body'], '<svg class="chart"'));
+check('the stats page shows the share as a stacked bar',
+    str_contains($res['body'], '<svg class="chart chart-stacked"'));
+check('the stacked bar comes with a legend', str_contains($res['body'], '<ul class="chart-legend">'));
+check('the bars are read against the total', str_contains($res['body'], '>100%</text>'));
 
 echo "=== csv ===\n";
 

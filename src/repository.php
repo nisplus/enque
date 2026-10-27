@@ -829,6 +829,11 @@ function answer_counts(int $surveyId, array $question, bool $includeDuplicates =
         }
     }
 
+    // 数値入力は選択肢の一覧を持たないので、回答が出てきた順ではなく値の順に並べ直す
+    if ((string) $question['type'] === 'number') {
+        ksort($counts, SORT_NUMERIC);
+    }
+
     return ['counts' => $counts, 'answered' => $answered];
 }
 

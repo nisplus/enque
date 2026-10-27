@@ -117,6 +117,7 @@ if ($group['configured'] && $group['groups'] > 0) {
 
     echo '<div class="card">';
     echo '<h3 style="margin-top:0">区分別の人数</h3>';
+    echo svg_stacked_bar(array_column($group['categories'], 'people', 'label'), $group['people'], 'series', '人');
     echo '<div class="table-scroll"><table>';
     echo '<thead><tr><th>区分</th><th class="num">合計人数</th><th class="num">構成比</th>'
         . '<th class="num">いた組</th><th class="num">1組あたり</th></tr></thead><tbody>';
@@ -134,6 +135,7 @@ if ($group['configured'] && $group['groups'] > 0) {
 
     echo '<div class="card">';
     echo '<h3 style="margin-top:0">よくあるグループの型</h3>';
+    echo svg_stacked_bar(array_column($group['patterns'], 'groups', 'label'), $group['groups'], 'series', '組');
     echo '<div class="table-scroll"><table>';
     echo '<thead><tr><th>型</th><th class="num">組数</th><th class="num">割合</th></tr></thead><tbody>';
     foreach ($group['patterns'] as $row) {
@@ -171,6 +173,7 @@ if ($group['configured'] && $group['groups'] > 0) {
         echo '<p>' . count_label($group['check']['compared'], '組') . '中'
             . count_label($group['check']['matched'], '組')
             . '（' . $group['check']['match_rate'] . '%）で、来場人数と内訳の合計が一致しています。</p>';
+        echo svg_stacked_bar($group['check']['distribution'], $group['check']['compared'], 'series', '組');
         echo '<div class="table-scroll"><table>';
         echo '<thead><tr><th>来場人数との差</th><th class="num">組数</th></tr></thead><tbody>';
         foreach ($group['check']['distribution'] as $label => $count) {

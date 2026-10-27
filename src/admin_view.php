@@ -106,23 +106,51 @@ function render_survey_stats(int $surveyId, array $questions, bool $includeDupli
         $result = answer_counts($surveyId, $question, $includeDuplicates);
         $counts = $result['counts'];
 
+        // グラフの見出し。星は「星3」、数値入力は単位付き（「3人」）にして単体で読めるようにする
+        $display = $counts;
+        if ($type === QuestionType::Rating || $type === QuestionType::Number) {
+            $suffix  = $type === QuestionType::Number ? number_settings($question)['unit'] : '';
+            $prefix  = $type === QuestionType::Rating ? '星' : '';
+            $display = [];
+            foreach ($counts as $value => $count) {
+                $display[$prefix . $value . $suffix] = $count;
+            }
+        }
+
         if ($type === QuestionType::Nps) {
             $nps = nps_breakdown($counts);
             echo '<div class="stat-grid">';
             render_stat('NPS', (string) $nps['score'], '推奨者' . $nps['promoters'] . '／中立' . $nps['passives'] . '／批判者' . $nps['detractors']);
             render_stat('回答数', count_label($nps['total']));
             echo '</div>';
+            // NPSは0〜10の11段階をそのまま並べても読めないので、帯は3分類で出す
+            echo svg_stacked_bar([
+                '批判者（0〜6）' => $nps['detractors'],
+                '中立（7〜8）'   => $nps['passives'],
+                '推奨者（9〜10）' => $nps['promoters'],
+            ], $nps['total'], ['var(--danger)', 'var(--text-muted)', 'var(--good)']);
         } elseif ($type === QuestionType::Rating) {
             echo '<div class="stat-grid">';
             render_stat('平均評価', (string) rating_average($counts) . ' / ' . RATING_MAX);
             render_stat('回答数', count_label($result['answered']));
             echo '</div>';
+            // 星は順序があるので、濃淡で「右へ行くほど高評価」が分かるようにする
+            echo svg_stacked_bar($display, $result['answered'], 'ramp');
         } else {
             echo '<p class="muted">回答数：' . count_label($result['answered'])
                 . ($type === QuestionType::Multi ? '（複数選択可）' : '') . '</p>';
+            if ($type === QuestionType::Multi) {
+                // 1人が2つ以上選べるため、選択肢の合計は回答者数を超える（＝帯にできない）
+                echo '<p class="muted">複数選択なので、割合の合計は100%を超えます。'
+                    . '棒の長さは「回答した方のうち、その選択肢を選んだ割合」です。</p>';
+            } else {
+                // 人数などの数値入力も順序尺度なので、濃淡で並び順が分かるようにする
+                echo svg_stacked_bar($display, $result['answered'],
+                    $type === QuestionType::Number ? 'ramp' : 'series');
+            }
         }
 
-        echo svg_bar_chart($counts, $type === QuestionType::Multi ? $result['answered'] : max($result['answered'], 0));
+        echo svg_bar_chart($display, $result['answered']);
         echo '</div>';
     }
 
