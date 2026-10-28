@@ -31,9 +31,13 @@
   --series-6:       #1f9aa8;
   --series-7:       #c3568f;
   --series-8:       #6b7684;
+  --series-9:       #d1495b;
+  --series-10:      #7f9f1f;
+  --series-11:      #8d6244;
+  --series-12:      #58a6e0;
   /* 順序尺度（星1〜5・人数の区分など）は同じ青の濃淡で並び順を見せる */
-  --ramp-1:         #cfe0f6;
-  --ramp-2:         #9cc2ee;
+  --ramp-1:         #c2d8f4;
+  --ramp-2:         #93bbeb;
   --ramp-3:         #6aa3e3;
   --ramp-4:         #3b85d8;
   --ramp-5:         #1f5fa8;
@@ -70,6 +74,10 @@
     --series-6:       #46c6d2;
     --series-7:       #d87aa9;
     --series-8:       #949fad;
+    --series-9:       #e8707f;
+    --series-10:      #a6c440;
+    --series-11:      #b08466;
+    --series-12:      #7cc0ef;
     --ramp-1:         #24405f;
     --ramp-2:         #2f5c8c;
     --ramp-3:         #3b7ab8;

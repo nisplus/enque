@@ -40,10 +40,13 @@ function svg_bar_path(float $x, float $y, float $w, float $h, float $r = 4.0): s
  *
  * 母数が分からないとき（0を渡したとき）だけ、いちばん多い項目を満タンにする。
  *
+ * 棒の色は帯グラフ（svg_stacked_bar）と同じ並びにして、上下の図が同じ色で読めるようにする。
+ *
  * @param array<string,int> $counts ラベル => 件数
  * @param int $total 母数（割合の分母。0なら割合を出さず、最大値を基準にする）
+ * @param string|list<string> $palette 'series'（名義尺度）/'ramp'（順序尺度）/色の並び
  */
-function svg_bar_chart(array $counts, int $total): string
+function svg_bar_chart(array $counts, int $total, string|array $palette = 'series'): string
 {
     if ($counts === []) {
         return '<p class="muted">回答がありません。</p>';
@@ -82,13 +85,16 @@ function svg_bar_chart(array $counts, int $total): string
               . 'x2="' . $x . '" y2="' . $gridBottom . '"/>';
     }
 
-    $y = 8;
+    $colors = chart_colors($palette, count($counts));
+    $y      = 8;
+    $index  = 0;
     foreach ($counts as $label => $count) {
         $barW = $barMaxW * $count / $scale;
         if ($count > 0) {
-            $svg .= '<path class="chart-bar" d="'
+            $svg .= '<path class="chart-bar" style="' . chart_fill($colors[$index], $index, $palette) . '" d="'
                   . svg_bar_path((float) $left, (float) ($y + $labelH), (float) $barW, (float) $barH) . '"/>';
         }
+        $index++;
         $svg .= '<text class="chart-value" x="' . ($left + $barMaxW + 8) . '" y="' . ($y + $labelH + 14) . '">'
               . $count . '件' . ($total > 0 ? ' (' . percentage($count, $total) . '%)' : '') . '</text>';
         $y += $rowH;
@@ -116,8 +122,9 @@ function svg_bar_chart(array $counts, int $total): string
  * 色だけに頼らず読めるよう、帯のすぐ下に必ず凡例（ラベル・件数・割合）を出す。
  */
 const CHART_SERIES_COLORS = [
-    'var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)',
-    'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)',
+    'var(--series-1)',  'var(--series-2)',  'var(--series-3)',  'var(--series-4)',
+    'var(--series-5)',  'var(--series-6)',  'var(--series-7)',  'var(--series-8)',
+    'var(--series-9)',  'var(--series-10)', 'var(--series-11)', 'var(--series-12)',
 ];
 const CHART_RAMP_COLORS = [
     'var(--ramp-1)', 'var(--ramp-2)', 'var(--ramp-3)', 'var(--ramp-4)', 'var(--ramp-5)',
@@ -159,6 +166,18 @@ function chart_colors(string|array $palette, int $count): array
     }
 
     return $colors;
+}
+
+/**
+ * 塗りの指定。色数を超えた項目は薄くして、同じ色の繰り返しに見えないようにする。
+ *
+ * @param string|list<string> $palette
+ */
+function chart_fill(string $color, int $index, string|array $palette): string
+{
+    $fade = !is_array($palette) && $palette === 'series' && $index >= count(CHART_SERIES_COLORS);
+
+    return 'fill:' . $color . ($fade ? ';fill-opacity:.55' : '');
 }
 
 /**
@@ -205,9 +224,8 @@ function svg_stacked_bar(array $counts, int $total, string|array $palette = 'ser
         $end   = $width * $done / $total;
         $color = $colors[$index];
 
-        // 項目が色数より多いときは、2周目を薄くして同じ色の繰り返しに見えないようにする
-        $fade  = $index >= count(CHART_SERIES_COLORS) && !is_array($palette) && $palette === 'series';
-        $style = 'fill:' . $color . ($fade ? ';fill-opacity:.55' : '');
+        $style = chart_fill($color, $index, $palette);
+        $fade  = str_contains($style, 'fill-opacity');
 
         if ($count > 0) {
             $x    = $index === 0 ? 0.0 : $start + $gap / 2;

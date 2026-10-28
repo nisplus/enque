@@ -566,9 +566,6 @@ function party_size_stats(int $eventId): array
     ];
 }
 
-/** グループの型として並べる上限（これより下は「その他」にまとめる） */
-const GROUP_PATTERN_LIMIT = 8;
-
 /** 「◯◯のみ」の行を出す最小グループ数（母数が小さい行は読み違いのもとになるため） */
 const GROUP_ONLY_MIN = 3;
 
@@ -588,7 +585,7 @@ const GROUP_ONLY_MIN = 3;
  * @return array{
  *   configured: bool, responses: int, groups: int, answer_rate: float, people: int, avg_size: float,
  *   categories: list<array{label: string, people: int, share: float, groups: int, group_share: float, avg: float}>,
- *   patterns: list<array{label: string, groups: int, share: float}>,
+ *   patterns: list<array{label: string, groups: int, share: float}>,  // 多い順。すべての型を並べる
  *   segments: list<array{label: string, groups: int, share: float, laps_avg: ?float, rating_avg: ?float}>,
  *   check: array{compared: int, matched: int, match_rate: float, distribution: array<string,int>}
  * }
@@ -704,25 +701,13 @@ function group_member_stats(int $eventId, int $surveyId, ?array $laps = null): a
         ];
     }
 
+    // 出てきた型はすべて並べる（少数の型にこそ気づきがあるため、「その他」にはまとめない）
     arsort($patternCounts);
-    $rest = 0;
     foreach ($patternCounts as $label => $count) {
-        if (count($stats['patterns']) < GROUP_PATTERN_LIMIT) {
-            $stats['patterns'][] = [
-                'label'  => (string) $label,
-                'groups' => $count,
-                'share'  => percentage($count, $groupCount),
-            ];
-            continue;
-        }
-        $rest++;
-    }
-    if ($rest > 0) {
-        $others = (int) array_sum(array_slice(array_values($patternCounts), GROUP_PATTERN_LIMIT));
         $stats['patterns'][] = [
-            'label'  => 'その他（' . $rest . '通り）',
-            'groups' => $others,
-            'share'  => percentage($others, $groupCount),
+            'label'  => (string) $label,
+            'groups' => $count,
+            'share'  => percentage($count, $groupCount),
         ];
     }
 

@@ -144,7 +144,8 @@ if ($group['configured'] && $group['groups'] > 0) {
         echo '<td class="num">' . $row['share'] . '%</td></tr>';
     }
     echo '</tbody></table></div>';
-    echo '<p class="muted">0人の区分は書いていません。多い順に' . GROUP_PATTERN_LIMIT . '通りまで並べています。</p>';
+    echo '<p class="muted">0人の区分は書いていません。出てきた型を多い順にすべて並べています（'
+        . count($group['patterns']) . '通り）。</p>';
     echo '</div>';
 
     if ($group['segments'] !== []) {

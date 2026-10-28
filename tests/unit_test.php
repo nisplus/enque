@@ -221,7 +221,7 @@ check('percentage avoids division by zero', percentage(3, 0) === 0.0);
 // 横棒は母数（100%）を基準にする。灰色の下地がちょうど100%にあたる
 $bars = svg_bar_chart(['A' => 25, 'B' => 75], 100);
 // 25%の棒は下地（544px）の4分の1。角丸のぶん4pxは曲線で描くので、直線部分は136-4
-preg_match('/<path class="chart-bar" d="M4\.0 25\.0 h([\d.]+)/', $bars, $bar);
+preg_match('/<path class="chart-bar"[^>]* d="M4\.0 25\.0 h([\d.]+)/', $bars, $bar);
 check('the bar chart scales to the total, not to the largest value',
     abs(((float) ($bar[1] ?? 0) + 4) - 544 * 0.25) < 0.01, 'bar=' . ($bar[1] ?? 'none'));
 check('the bar chart draws the full-width track', str_contains($bars, 'width="544"'));
@@ -254,7 +254,13 @@ check('rounding never leaves a gap at the right edge',
     'end=' . ((float) end($segs[1]) + (float) end($segs[2])));
 
 check('the series palette repeats after the last colour',
-    chart_colors('series', 9)[8] === chart_colors('series', 9)[0]);
+    chart_colors('series', 13)[12] === chart_colors('series', 13)[0]);
+check('the series palette offers twelve colours before repeating',
+    count(array_unique(chart_colors('series', 12))) === 12);
+check('the bars are coloured item by item, like the stacked bar',
+    substr_count(svg_bar_chart(['A' => 1, 'B' => 1], 2), 'style="fill:var(--series-') === 2);
+check('an ordinal bar chart uses the ramp',
+    str_contains(svg_bar_chart(['A' => 1, 'B' => 1], 2, 'ramp'), 'style="fill:var(--ramp-5)'));
 check('the ramp spans from the lightest to the darkest',
     chart_colors('ramp', 3) === ['var(--ramp-1)', 'var(--ramp-3)', 'var(--ramp-5)'],
     implode(',', chart_colors('ramp', 3)));

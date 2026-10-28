@@ -107,6 +107,8 @@ function render_survey_stats(int $surveyId, array $questions, bool $includeDupli
         $counts = $result['counts'];
 
         // グラフの見出し。星は「星3」、数値入力は単位付き（「3人」）にして単体で読めるようにする
+        // 星・数値・NPSは順序があるので濃淡（ramp）、選択肢は色分け（series）で描く
+        $palette = $type === QuestionType::Single || $type === QuestionType::Multi ? 'series' : 'ramp';
         $display = $counts;
         if ($type === QuestionType::Rating || $type === QuestionType::Number) {
             $suffix  = $type === QuestionType::Number ? number_settings($question)['unit'] : '';
@@ -150,7 +152,7 @@ function render_survey_stats(int $surveyId, array $questions, bool $includeDupli
             }
         }
 
-        echo svg_bar_chart($display, $result['answered']);
+        echo svg_bar_chart($display, $result['answered'], $palette);
         echo '</div>';
     }
 
